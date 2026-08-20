@@ -1,0 +1,62 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Open Autofill options</title>
+    <link rel="stylesheet" href="options.css" />
+  </head>
+  <body>
+    <main>
+      <header>
+        <h1>Open Autofill</h1>
+        <p>Always free. Local only. Your answers never go to the cloud.</p>
+        <p class="muted"><a href="privacy.html">Privacy policy</a></p>
+      </header>
+
+      <section>
+        <h2>Settings</h2>
+        <label><input type="checkbox" id="autoFill" /> Fill matching fields when a page loads</label>
+        <label><input type="checkbox" id="autoLearn" /> Remember values as I type or submit</label>
+        <label><input type="checkbox" id="highlightFilled" /> Outline fields after filling</label>
+        <label><input type="checkbox" id="skipPasswords" /> Never touch password fields</label>
+        <label><input type="checkbox" id="skipPaymentAndSsn" /> Never fill card numbers, CVV, or SSN</label>
+      </section>
+
+      <section>
+        <h2>Identity profile</h2>
+        <p class="muted">Used on every site when the field looks like email, name, address, Instagram, etc.</p>
+        <div id="identity" class="grid"></div>
+      </section>
+
+      <section>
+        <h2>Ignored sites</h2>
+        <p class="muted">One hostname per line. Example: <code>accounts.google.com</code></p>
+        <textarea id="excluded" rows="5" spellcheck="false"></textarea>
+      </section>
+
+      <section>
+        <h2>Remembered site fields</h2>
+        <p class="muted">Odd extra questions live here, keyed to the website.</p>
+        <div id="sites"></div>
+      </section>
+
+      <section>
+        <h2>Backup</h2>
+        <p class="muted">
+          Export writes a JSON file to your computer. Import reads a file you choose. Neither step uploads anything.
+        </p>
+        <div class="row">
+          <button id="export">Export JSON</button>
+          <label class="file">
+            Import JSON
+            <input type="file" id="import" accept="application/json" />
+          </label>
+        </div>
+        <p id="backupStatus" class="muted" hidden></p>
+      </section>
+    </main>
+    <script src="shared.js"></script>
+    <script src="options.js"></script>
+  </body>
+</html>

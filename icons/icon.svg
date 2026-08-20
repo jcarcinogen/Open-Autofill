@@ -1,0 +1,29 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128" fill="none">
+  <rect width="128" height="128" rx="28" fill="#4CAF50"/>
+  <!-- rounded form outline, open toward the pencil -->
+  <path
+    d="M34 38
+       h42
+       a16 16 0 0 1 16 16
+       v10
+       M34 38
+       v52
+       a16 16 0 0 0 16 16
+       h24"
+    stroke="#FFFFFF"
+    stroke-width="9"
+    stroke-linecap="round"
+    stroke-linejoin="round"
+  />
+  <!-- pencil -->
+  <g transform="translate(76 70) rotate(-46)">
+    <path d="M-7.2 18 L0 32.5 L7.2 18 Z" fill="#FFFFFF"/>
+    <rect x="-7.2" y="-20" width="14.4" height="39" rx="2.2" fill="#FFFFFF"/>
+    <rect x="-7.2" y="-28" width="14.4" height="10" rx="2.4" fill="#FFFFFF"/>
+    <rect x="-7.2" y="-19.2" width="14.4" height="3.4" fill="#4CAF50"/>
+    <path d="M0 20.5 L0 28" stroke="#4CAF50" stroke-width="2.2" stroke-linecap="round"/>
+  </g>
+  <!-- sparkles -->
+  <path fill="#FFFFFF" d="M97 22 L100.1 32.2 L110.5 35.2 L100.1 38.2 L97 48.4 L93.9 38.2 L83.5 35.2 L93.9 32.2 Z"/>
+  <path fill="#FFFFFF" d="M110 56 L111.8 61.6 L117.5 63.4 L111.8 65.2 L110 70.8 L108.2 65.2 L102.5 63.4 L108.2 61.6 Z"/>
+</svg>

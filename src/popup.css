@@ -1,0 +1,138 @@
+:root {
+  color-scheme: dark;
+  --bg: #161513;
+  --card: #201e1b;
+  --ink: #f3ece3;
+  --muted: #b4a99b;
+  --line: #3a342c;
+  --accent: #4caf50;
+  --accent-ink: #0f2412;
+  --ok: #8fce7a;
+  --danger: #e08a7a;
+  font-family: "SF Pro Text", "Segoe UI", system-ui, sans-serif;
+}
+
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  width: 360px;
+  background: var(--bg);
+  color: var(--ink);
+  padding: 14px;
+}
+
+header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+h1 {
+  font-size: 16px;
+  margin: 0 0 2px;
+}
+
+h2 {
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--muted);
+  margin: 14px 0 6px;
+}
+
+.muted { color: var(--muted); margin: 0; }
+.small { font-size: 12px; line-height: 1.4; }
+
+.switch {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  color: var(--muted);
+  white-space: nowrap;
+}
+
+.actions {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+
+button {
+  border: 1px solid var(--line);
+  background: var(--card);
+  color: var(--ink);
+  border-radius: 8px;
+  padding: 8px 10px;
+  font: inherit;
+  font-size: 13px;
+  cursor: pointer;
+}
+
+button.primary {
+  background: var(--accent);
+  color: var(--accent-ink);
+  border-color: transparent;
+  font-weight: 650;
+}
+
+button.ghost {
+  background: transparent;
+  border-color: transparent;
+  color: var(--muted);
+  padding: 6px 4px;
+}
+
+button:hover { filter: brightness(1.08); }
+
+.status {
+  margin: 10px 0 0;
+  font-size: 12px;
+  color: var(--ok);
+}
+
+.status.err { color: var(--danger); }
+
+.grid {
+  display: grid;
+  gap: 6px;
+  max-height: 280px;
+  overflow: auto;
+}
+
+.field {
+  display: grid;
+  grid-template-columns: 92px 1fr;
+  gap: 8px;
+  align-items: center;
+}
+
+.field label {
+  font-size: 11px;
+  color: var(--muted);
+}
+
+input[type="text"],
+input[type="email"],
+input[type="tel"],
+input[type="url"] {
+  width: 100%;
+  border: 1px solid var(--line);
+  background: #12110f;
+  color: var(--ink);
+  border-radius: 6px;
+  padding: 6px 8px;
+  font: inherit;
+  font-size: 12px;
+}
+
+footer {
+  display: flex;
+  justify-content: space-between;
+  margin-top: 10px;
+  border-top: 1px solid var(--line);
+  padding-top: 6px;
+}

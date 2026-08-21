@@ -55,11 +55,11 @@
   const MARKETING_RE =
     /(newsletter|marketing|promotions?|offers?|sign\s*up to receive|wish to receive|receive .{0,40}updates|email me|send me|third[-\s]?part|partners?|sms alerts?|text alerts?|unsubscribe|\bopt[_-]?in\b)/i;
   const AGREEMENT_RE =
-    /(official\s*rules|terms\s*(and|&)\s*conditions|terms\s*of\s*(use|service)|\bi agree\b|\bi accept\b|i have read|i['’]ve read|eligibility|18\s*(years|or older)|over\s*18)/i;
+    /(official\s*rules|terms\s*(and|&)\s*conditions|terms\s*of\s*(use|service)|sweepstakes|\bi agree\b|\bi agreed\b|\bi accept\b|i have read|i['’]ve read|agreed to|agree to (the|these)|eligibility|18\s*(years|or older)|over\s*18)/i;
   const RECAPTCHA_RE = /(recaptcha|g-recaptcha|i['’]m not a robot|not a robot)/i;
 
   const SENSITIVE_RE =
-    /(password|passwd|passcode|new[_-]?pass|current[_-]?pass|card[_-]?number|cc[_-]?num|credit[_-]?card|cardholder|cvc|cvv|cid|csc|ssn|social[_-]?security|routing[_-]?number|account[_-]?number|iban|swift)/i;
+    /(password|passwd|passcode|new[_-]?pass|current[_-]?pass|card[_-]?number|cc[_-]?num|credit[_-]?card|cardholder|\bcvc\b|\bcvv\b|\bcid\b|\bcsc\b|\bssn\b|social[_-]?security|routing[_-]?number|account[_-]?number|\biban\b|\bswift\b)/i;
 
   const SKIP_TYPES = new Set([
     "password",
@@ -124,8 +124,30 @@
     return "other";
   }
 
+  function radioPersistValue(info, value) {
+    if (value === false || value === "false" || value === "") return "";
+    if (isCheckedValue(value) && String(value) !== String(info.value || "") && String(value).toLowerCase() !== "on") {
+      return norm(info.label) || norm(info.value) || "true";
+    }
+    const raw = value == null || value === true || value === "true" ? info.value || info.label : value;
+    if (info.label && (!raw || isVolatileToken(raw) || /^(on|true|false|\d+)$/i.test(String(raw)))) {
+      return norm(info.label);
+    }
+    return norm(raw) || norm(info.label);
+  }
+
+  function radioMatches(info, resolved) {
+    if (!resolved) return false;
+    const candidates = [resolved.value, resolved.optionLabel, resolved.optionValue]
+      .map((v) => norm(v).toLowerCase())
+      .filter(Boolean);
+    if (!candidates.length) return false;
+    const here = [info.value, info.label].map((v) => norm(v).toLowerCase()).filter(Boolean);
+    return here.some((h) => candidates.includes(h));
+  }
+
   function isCheckedValue(value) {
-    return value === true || value === "true" || value === "on" || value === "1" || value === 1;
+    return value === true || value === "true" || value === "on";
   }
 
   function isVolatileToken(s) {
@@ -159,7 +181,13 @@
       if (!allowVolatile && isVolatileToken(v)) return;
       keys.push(prefix + (prefix.startsWith("label") || prefix.startsWith("aria") || prefix.startsWith("ph") ? v.toLowerCase() : v));
     };
-    if (kind === "checkbox" || kind === "radio") {
+    if (kind === "radio") {
+      push("radiogroup:", info.groupLabel, true);
+      push("radioname:", info.groupName || info.name, false);
+      push("label:", info.label, true);
+      return keys;
+    }
+    if (kind === "checkbox") {
       push("label:", info.label, true);
       push("aria:", info.ariaLabel, true);
       push("name:", info.name, false);
@@ -225,7 +253,7 @@
     );
   }
 
-  function resolveValue(info, identity, siteFields, settings) {
+  function resolveValue(info, identity, siteFields, settings, cleared) {
     const meta = classify(info, settings);
     if (meta.skip) return { ...meta, value: "", source: null };
 
@@ -235,38 +263,70 @@
     }
 
     const site = lookupSiteValue(siteFields, meta.siteKeys);
-    if (site && site.value !== undefined && site.value !== "") {
-      return { ...meta, value: site.value, source: "site" };
+    if (meta.kind === "radio") {
+      if (site && radioMatches(info, site)) {
+        return {
+          ...meta,
+          value: info.value || info.label || site.value,
+          optionLabel: site.optionLabel || site.value,
+          source: "site"
+        };
+      }
+      return { ...meta, value: "", source: null };
     }
 
     if (meta.semantic && meta.kind !== "checkbox") {
+      if (cleared && cleared[meta.semantic]) return { ...meta, value: "", source: null };
       const value = identityValue(identity, meta.semantic);
       if (value) return { ...meta, value, source: "identity" };
+      return { ...meta, value: "", source: null };
+    }
+
+    if (site && site.semantic && cleared && cleared[site.semantic]) {
+      return { ...meta, value: "", source: null };
+    }
+    if (site && site.semantic && identityValue(identity, site.semantic)) {
+      return { ...meta, value: identityValue(identity, site.semantic), source: "identity" };
+    }
+    if (site && site.value !== undefined && site.value !== "") {
+      return { ...meta, value: site.value, optionLabel: site.optionLabel, source: "site" };
     }
 
     return { ...meta, value: "", source: null };
   }
 
-  function learnFromField(info, value, identity, siteFields, settings) {
+  function learnFromField(info, value, identity, siteFields, settings, options) {
+    const opts = options || {};
+    const cleared = { ...(opts.cleared || {}) };
+    const overwriteIdentity = !!opts.overwriteIdentity;
     const meta = classify(info, settings);
     const nextIdentity = { ...identity };
     const nextSite = Array.isArray(siteFields) ? siteFields.slice() : [];
     const trimmed = value == null ? "" : String(value);
     if (meta.skip || meta.sensitive) {
-      return { identity: nextIdentity, siteFields: nextSite, learned: null };
+      return { identity: nextIdentity, siteFields: nextSite, cleared, learned: null };
     }
     if (trimmed === "" && meta.kind !== "checkbox") {
-      return { identity: nextIdentity, siteFields: nextSite, learned: null };
+      return { identity: nextIdentity, siteFields: nextSite, cleared, learned: null };
+    }
+    if (meta.kind === "radio" && (value === false || value === "false")) {
+      return { identity: nextIdentity, siteFields: nextSite, cleared, learned: null };
     }
 
     let learned = null;
     const checked = isCheckedValue(value);
     if (meta.kind === "checkbox" && meta.role === "agreement" && checked) {
       nextIdentity.agreeToRules = "true";
+      delete cleared.agreeToRules;
       learned = { target: "identity", key: "agreeToRules", value: "true" };
     } else if (meta.semantic && (meta.kind === "text" || meta.kind === "select")) {
-      nextIdentity[meta.semantic] = trimmed;
-      learned = { target: "identity", key: meta.semantic, value: trimmed };
+      const existing = identityValue(identity, meta.semantic);
+      const blocked = !!cleared[meta.semantic];
+      if (!blocked && (overwriteIdentity || !existing)) {
+        nextIdentity[meta.semantic] = trimmed;
+        delete cleared[meta.semantic];
+        learned = { target: "identity", key: meta.semantic, value: trimmed };
+      }
     }
 
     const keys = meta.siteKeys || [];
@@ -279,7 +339,7 @@
     // Do not snapshot "unchecked" as a remembered value — that blocked Official
     // Rules boxes on later visits when the page used a new random field id.
     if (meta.kind === "checkbox" && !checked && existingIdx < 0) {
-      return { identity: nextIdentity, siteFields: nextSite, learned };
+      return { identity: nextIdentity, siteFields: nextSite, cleared, learned };
     }
 
     if (keys.length) {
@@ -287,7 +347,9 @@
         key: keys[0],
         aliases: keys.slice(1),
         type: meta.kind,
-        value: meta.kind === "checkbox" ? String(checked) : trimmed,
+        value: meta.kind === "checkbox" ? String(checked) : meta.kind === "radio" ? radioPersistValue(info, value) : trimmed,
+        optionLabel: meta.kind === "radio" ? norm(info.label) : undefined,
+        optionValue: meta.kind === "radio" ? norm(info.value) : undefined,
         semantic: meta.semantic || null,
         role: meta.role || null,
         label: info.label || info.placeholder || info.name || info.id || keys[0]
@@ -297,7 +359,7 @@
       if (!learned) learned = { target: "site", key: rec.key, value: rec.value };
     }
 
-    return { identity: nextIdentity, siteFields: nextSite, learned };
+    return { identity: nextIdentity, siteFields: nextSite, cleared, learned };
   }
 
   root.FMMatcher = {
@@ -307,6 +369,8 @@
     classifyFromText,
     classifyAutocomplete,
     checkboxRole,
+    radioPersistValue,
+    radioMatches,
     isSensitive,
     shouldSkip,
     siteKey,

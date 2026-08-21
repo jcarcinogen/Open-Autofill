@@ -44,12 +44,37 @@
     Object.fromEntries(IDENTITY_FIELDS.map((f) => [f.key, ""]));
 
   async function loadState() {
-    const raw = await chrome.storage.local.get(["settings", "identity", "sites"]);
+    const raw = await chrome.storage.local.get(["settings", "identity", "sites", "cleared"]);
     return {
       settings: { ...DEFAULT_SETTINGS, ...(raw.settings || {}) },
       identity: { ...emptyIdentity(), ...(raw.identity || {}) },
-      sites: raw.sites && typeof raw.sites === "object" ? raw.sites : {}
+      sites: raw.sites && typeof raw.sites === "object" ? raw.sites : {},
+      cleared: raw.cleared && typeof raw.cleared === "object" ? raw.cleared : {}
     };
+  }
+
+  function stripSemanticFromSites(sites, semantic) {
+    const next = {};
+    for (const [host, rec] of Object.entries(sites || {})) {
+      next[host] = {
+        ...rec,
+        fields: (rec.fields || []).filter((f) => f.semantic !== semantic)
+      };
+    }
+    return next;
+  }
+
+  async function setIdentityValue(key, value) {
+    const state = await loadState();
+    const identity = { ...state.identity, [key]: value };
+    const cleared = { ...(state.cleared || {}) };
+    let sites = state.sites;
+    if (value) delete cleared[key];
+    else {
+      cleared[key] = true;
+      sites = stripSemanticFromSites(sites, key);
+    }
+    await saveState({ identity, cleared, sites });
   }
 
   async function saveState(partial) {
@@ -83,6 +108,8 @@
     emptyIdentity,
     loadState,
     saveState,
+    setIdentityValue,
+    stripSemanticFromSites,
     hostFromUrl,
     isExcluded,
     normalizeHandle

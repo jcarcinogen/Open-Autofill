@@ -22,18 +22,14 @@ async function render() {
       input.type = "checkbox";
       input.checked = state.identity[field.key] === "true";
       input.addEventListener("change", async () => {
-        const current = await FM.loadState();
-        current.identity[field.key] = input.checked ? "true" : "";
-        await FM.saveState({ identity: current.identity });
+        await FM.setIdentityValue(field.key, input.checked ? "true" : "");
       });
     } else {
       input.type = field.key === "email" ? "email" : "text";
       input.placeholder = field.placeholder;
       input.value = state.identity[field.key] || "";
       input.addEventListener("change", async () => {
-        const current = await FM.loadState();
-        current.identity[field.key] = input.value.trim();
-        await FM.saveState({ identity: current.identity });
+        await FM.setIdentityValue(field.key, input.value.trim());
       });
     }
     identityEl.append(label, input);

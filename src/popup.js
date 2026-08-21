@@ -34,23 +34,22 @@ async function render() {
       input.type = "checkbox";
       input.checked = state.identity[field.key] === "true";
       input.addEventListener("change", async () => {
-        const current = await FM.loadState();
-        current.identity[field.key] = input.checked ? "true" : "";
-        await FM.saveState({ identity: current.identity });
+        await FM.setIdentityValue(field.key, input.checked ? "true" : "");
       });
     } else {
       input.type = field.key === "email" ? "email" : field.key === "phone" ? "tel" : "text";
       input.placeholder = field.placeholder;
       input.value = state.identity[field.key] || "";
-      input.addEventListener("change", async () => {
-        const current = await FM.loadState();
-        current.identity[field.key] = input.value.trim();
+      const save = async () => {
+        await FM.setIdentityValue(field.key, input.value.trim());
         if (field.key === "firstName" || field.key === "lastName") {
+          const current = await FM.loadState();
           const full = [current.identity.firstName, current.identity.lastName].filter(Boolean).join(" ");
-          if (full && !current.identity.fullName) current.identity.fullName = full;
+          if (full && !current.identity.fullName) await FM.setIdentityValue("fullName", full);
         }
-        await FM.saveState({ identity: current.identity });
-      });
+      };
+      input.addEventListener("change", save);
+      input.addEventListener("blur", save);
     }
     wrap.append(label, input);
     identityEl.append(wrap);

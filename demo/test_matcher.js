@@ -169,4 +169,69 @@ const cjMarketing = {
 assert(M.checkboxRole(cjMarketing) === "marketing", "cayman marketing");
 assert(!M.resolveValue(cjMarketing, { agreeToRules: "true" }, [], settings).value, "no marketing fill");
 
+const radioBase = {
+  tag: "input",
+  type: "radio",
+  name: "QID2",
+  placeholder: "",
+  autocomplete: "",
+  ariaLabel: "",
+  groupName: "QID2",
+  groupLabel: "When do you plan on acquiring your next vehicle?",
+  disabled: false,
+  readOnly: false
+};
+const undecided = { ...radioBase, id: "r6", label: "Undecided", value: "6" };
+const month = { ...radioBase, id: "r1", label: "1 month or less", value: "1" };
+assert(M.radioPersistValue(undecided, "6") === "Undecided", "persist label not code");
+assert(M.radioPersistValue(undecided, true) === "Undecided", "persist boolean true");
+const learnedRadio = M.learnFromField(undecided, "6", {}, [], settings);
+assert(learnedRadio.siteFields[0].value === "Undecided", "store undecided");
+const fillUndecided = M.resolveValue(undecided, {}, learnedRadio.siteFields, settings);
+const fillMonth = M.resolveValue(month, {}, learnedRadio.siteFields, settings);
+assert(fillUndecided.source === "site" && fillUndecided.value, "fill chosen radio");
+assert(!fillMonth.value, "do not fill other radio");
+assert(M.radioMatches(undecided, learnedRadio.siteFields[0]), "match undecided");
+assert(!M.radioMatches(month, learnedRadio.siteFields[0]), "no match month");
+
+const nbc = {
+  tag: "input",
+  type: "checkbox",
+  name: "terms",
+  id: "terms",
+  placeholder: "",
+  autocomplete: "",
+  label: "I have read and agreed to the Win Like a Warrior Sweepstakes.",
+  ariaLabel: "",
+  value: "on",
+  disabled: false,
+  readOnly: false
+};
+assert(M.checkboxRole(nbc) === "agreement", "nbc agreed");
+const nbcLearn = M.learnFromField(nbc, true, {}, [], settings);
+assert(nbcLearn.identity.agreeToRules === "true", "nbc sets agree");
+
+const addr2 = {
+  tag: "input",
+  type: "text",
+  name: "address2",
+  id: "address2",
+  placeholder: "",
+  autocomplete: "address-line2",
+  label: "Address 2 (optional)",
+  ariaLabel: "",
+  value: "",
+  disabled: false,
+  readOnly: false
+};
+const siteJunk = [{ key: "name:address2", type: "text", value: "hnmgd", semantic: "address2" }];
+const fromIdentity = M.resolveValue(addr2, { address2: "naphj" }, siteJunk, settings, {});
+assert(fromIdentity.value === "naphj" && fromIdentity.source === "identity", "settings beat site junk");
+const cleared = M.resolveValue(addr2, { address2: "" }, siteJunk, settings, { address2: true });
+assert(!cleared.value, "cleared address2 stays empty");
+const noOverwrite = M.learnFromField(addr2, "hnmgd", { address2: "naphj" }, [], settings, { overwriteIdentity: false });
+assert(noOverwrite.identity.address2 === "naphj", "auto-learn does not overwrite");
+const blocked = M.learnFromField(addr2, "hnmgd", { address2: "" }, [], settings, { overwriteIdentity: false, cleared: { address2: true } });
+assert(!blocked.identity.address2, "cleared blocks auto-learn");
+
 console.log("ok");

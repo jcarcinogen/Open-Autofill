@@ -1,6 +1,6 @@
 # Open Autofill — Privacy Policy
 
-Last updated: August 20, 2026
+Last updated: August 21, 2026
 
 Open Autofill is a free browser extension. It is designed so your form answers **never leave your device**.
 
@@ -34,7 +34,7 @@ Open Autofill can run on websites so it can fill forms. Page contents are proces
 
 ## Contact
 
-This is personal software. If you publish it on the Chrome Web Store, put a contact email here before listing.
+Questions about this policy: [scottdangel@gmail.com](mailto:scottdangel@gmail.com)
 
 ## Changes
 

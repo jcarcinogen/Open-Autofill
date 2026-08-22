@@ -45,7 +45,7 @@ Productivity / Tools
 - Sold: no
 - Used for ads: no
 - Transferred: no (except the user exporting their own JSON file)
-- Privacy policy URL: host store/PRIVACY.md on HTTPS before submitting (GitHub Pages is enough)
+- Privacy policy URL: https://github.com/jcarcinogen/Open-Autofill/blob/main/store/PRIVACY.md
 
 ## Assets still needed before submit
 

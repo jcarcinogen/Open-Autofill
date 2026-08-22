@@ -46,6 +46,12 @@ Visit [http://127.0.0.1:8765/form.html](http://127.0.0.1:8765/form.html) **in Ch
 - Cross-origin widgets inside iframes only fill if the iframe is a normal `http(s)` page the extension can see.
 - Data lives in this Chrome profile only. It does not sync unless you export the JSON.
 
+## Support
+
+Open Autofill is free and always will be. Tips are optional:
+
+[ko-fi.com/scottangel](https://ko-fi.com/scottangel)
+
 ## Tests
 
 ```bash

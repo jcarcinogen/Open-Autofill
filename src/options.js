@@ -2,7 +2,7 @@ const identityEl = document.getElementById("identity");
 const sitesEl = document.getElementById("sites");
 const excludedEl = document.getElementById("excluded");
 
-const SETTING_IDS = ["autoFill", "autoLearn", "highlightFilled", "skipPasswords", "skipPaymentAndSsn"];
+const SETTING_IDS = ["autoFill", "autoLearn", "highlightFilled", "skipPasswords", "skipPaymentAndSsn", "fillSearchFields"];
 
 async function render() {
   const state = await FM.loadState();

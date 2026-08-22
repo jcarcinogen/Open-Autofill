@@ -4,15 +4,14 @@ A Chrome extension that remembers what you type in forms and fills it again the 
 
 This is original software for your own browser profile. It is not Lightning Autofill and does not use their code.
 
-Install it in **Google Chrome**. Daily browsing can stay in Brave; Open Autofill’s answers live in Chrome’s profile.
-
 ## What it does
 
 - Keeps a reusable **identity** (email, name, address, phone, Instagram, etc.)
 - Also remembers **odd extra fields per website** that Chrome’s built-in autofill misses
 - Learns as you type, blur, or submit
-- Remembers **Official Rules / I agree** checkboxes (not marketing opt-ins) and checks them again on other sites
+- Remembers **Official Rules / I agree** checkboxes (not marketing opt-ins)
 - Auto-fills when a page loads, including fields that appear late
+- Leaves **search boxes** alone by default (Google, Bing, Gmail, Outlook). Turn that on in settings if you want it.
 - Keyboard: `Alt+Shift+F` fill, `Alt+Shift+S` remember
 - Right-click: fill, remember, or ignore this site
 - Skips passwords, card numbers, CVV, and SSN
@@ -20,17 +19,15 @@ Install it in **Google Chrome**. Daily browsing can stay in Brave; Open Autofill
 
 ## Install in Chrome
 
-1. Open Chrome
-2. Go to `chrome://extensions`
+1. Clone or download this repo
+2. Open Chrome → `chrome://extensions`
 3. Turn on **Developer mode**
 4. Click **Load unpacked**
-5. Choose this folder: `/Users/scott/Projects/field-memory`
+5. Choose the **Open-Autofill** folder (the one that contains `manifest.json`)
 6. Pin **Open Autofill** on the toolbar
 7. Open the icon and type your usual answers once
 
-After that, visiting a form should fill those fields. Site-specific extras get picked up the first time you type them.
-
-If it is already loaded, click **Reload** on the extension card so the new description shows up.
+If it is already loaded from an older folder name, remove it and Load unpacked again from `Open-Autofill`.
 
 ## Try the practice form
 
@@ -47,7 +44,7 @@ Visit [http://127.0.0.1:8765/form.html](http://127.0.0.1:8765/form.html) **in Ch
 - It is not a clone of Lightning Autofill’s rule language, JavaScript macros, or recaptcha features.
 - Custom dropdowns that are not real `<select>` elements may not fill.
 - Cross-origin widgets inside iframes only fill if the iframe is a normal `http(s)` page the extension can see.
-- Data lives in this Chrome profile only. It does not sync to Brave or your phone unless you export the JSON.
+- Data lives in this Chrome profile only. It does not sync unless you export the JSON.
 
 ## Tests
 

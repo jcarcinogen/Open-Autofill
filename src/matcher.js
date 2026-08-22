@@ -161,6 +161,25 @@
     return SENSITIVE_RE.test(blobFromField(info));
   }
 
+  function isSearchField(info) {
+    const type = String(info.type || "").toLowerCase();
+    const role = String(info.role || "").toLowerCase();
+    if (type === "search" || role === "searchbox") return true;
+    if (info.inSearchForm) return true;
+    const name = String(info.name || "").toLowerCase();
+    const id = String(info.id || "").toLowerCase();
+    if (/^(q|query|search|search_query|searchquery|keywords?)$/i.test(name)) return true;
+    if (/^(q|query|search|search_query|gbqfq)$/i.test(id)) return true;
+    const label = norm(info.label);
+    if (label.length > 40 && /\?/.test(label)) return false;
+    const hint = [info.placeholder, info.ariaLabel, label].map(norm).join(" ");
+    if (/^(search|search mail|search the web)\b/i.test(norm(info.placeholder) || norm(info.ariaLabel) || label)) {
+      return true;
+    }
+    if (/\b(search mail|search the web|search google|search bing|search outlook)\b/i.test(hint)) return true;
+    return false;
+  }
+
   function shouldSkip(info, settings) {
     const type = String(info.type || "text").toLowerCase();
     if (SKIP_TYPES.has(type) && type !== "hidden") return true;
@@ -168,6 +187,7 @@
     if (RECAPTCHA_RE.test(blobFromField(info))) return true;
     if (settings && settings.skipPasswords && type === "password") return true;
     if (settings && settings.skipPaymentAndSsn && isSensitive(info)) return true;
+    if (!(settings && settings.fillSearchFields) && isSearchField(info)) return true;
     if (info.disabled || info.readOnly) return true;
     return false;
   }
@@ -372,6 +392,7 @@
     radioPersistValue,
     radioMatches,
     isSensitive,
+    isSearchField,
     shouldSkip,
     siteKey,
     siteKeys,

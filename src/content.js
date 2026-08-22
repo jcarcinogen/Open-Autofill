@@ -141,6 +141,8 @@
       autocomplete: el.getAttribute("autocomplete") || el.autocomplete || "",
       label,
       ariaLabel: el.getAttribute("aria-label") || "",
+      role,
+      inSearchForm: !!(el.closest && el.closest('form[role="search"], [role="search"]')),
       value: type === "checkbox" || type === "radio" ? el.getAttribute("value") || el.value || "" : "",
       groupName: type === "radio" ? el.name || "" : "",
       groupLabel: type === "radio" ? findQuestion(el) : "",

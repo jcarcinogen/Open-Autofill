@@ -234,4 +234,33 @@ assert(noOverwrite.identity.address2 === "naphj", "auto-learn does not overwrite
 const blocked = M.learnFromField(addr2, "hnmgd", { address2: "" }, [], settings, { overwriteIdentity: false, cleared: { address2: true } });
 assert(!blocked.identity.address2, "cleared blocks auto-learn");
 
+const googleQ = {
+  tag: "textarea",
+  type: "text",
+  name: "q",
+  id: "APjFqb",
+  placeholder: "Search",
+  autocomplete: "off",
+  label: "",
+  ariaLabel: "Search",
+  disabled: false,
+  readOnly: false
+};
+assert(M.isSearchField(googleQ), "google search");
+assert(M.shouldSkip(googleQ, settings), "skip search by default");
+assert(!M.shouldSkip(googleQ, { ...settings, fillSearchFields: true }), "opt-in search fill");
+const gmail = {
+  tag: "input",
+  type: "text",
+  name: "q",
+  id: "gbqfq",
+  placeholder: "Search mail",
+  autocomplete: "off",
+  label: "",
+  ariaLabel: "Search mail",
+  disabled: false,
+  readOnly: false
+};
+assert(M.isSearchField(gmail), "gmail search");
+
 console.log("ok");

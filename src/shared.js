@@ -37,6 +37,7 @@
     skipPasswords: true,
     skipPaymentAndSsn: true,
     fillDelayMs: 150,
+    fillSearchFields: false,
     excludedHosts: []
   };
 

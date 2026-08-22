@@ -38,7 +38,7 @@
     { key: "firstName", re: /(first[_-\s]?name|given[_-\s]?name|forename|\bfname\b|\bfirstname\b)/i },
     { key: "lastName", re: /(last[_-\s]?name|family[_-\s]?name|surname|\blname\b|\blastname\b)/i },
     { key: "phone", re: /(phone|mobile|cell|telephone|\btel\b)/i },
-    { key: "address2", re: /(address[_-\s]?line[_-\s]?2|addr(?:ess)?[_-]?2|apt|suite|unit|apartment)/i },
+    { key: "address2", re: /(address[_-\s]?line[_-\s]?2|addr(?:ess)?[\s_-]?2|\bapt\.?\b|\bsuite\b|\bunit\b|\bapartment\b)/i },
     { key: "address1", re: /(street[_-\s]?address|address[_-\s]?line[_-\s]?1|addr(?:ess)?[_-]?1|\bstreet\b|\baddress\b)/i },
     { key: "city", re: /(\bcity\b|\btown\b)/i },
     { key: "state", re: /(\bstate\b|\bprovince\b|\bregion\b)/i },
@@ -56,7 +56,8 @@
     /(newsletter|marketing|promotions?|offers?|sign\s*up to receive|wish to receive|receive .{0,40}updates|email me|send me|third[-\s]?part|partners?|sms alerts?|text alerts?|unsubscribe|\bopt[_-]?in\b)/i;
   const AGREEMENT_RE =
     /(official\s*rules|terms\s*(and|&)\s*conditions|terms\s*of\s*(use|service)|sweepstakes|\bi agree\b|\bi agreed\b|\bi accept\b|i have read|i['’]ve read|agreed to|agree to (the|these)|eligibility|18\s*(years|or older)|over\s*18)/i;
-  const RECAPTCHA_RE = /(recaptcha|g-recaptcha|i['’]m not a robot|not a robot)/i;
+  const CAPTCHA_RE =
+    /(recaptcha|g-recaptcha|hcaptcha|h-captcha|turnstile|captcha|i['’]m not a robot|not a robot|characters seen in the picture|type the characters)/i;
 
   const SENSITIVE_RE =
     /(password|passwd|passcode|new[_-]?pass|current[_-]?pass|card[_-]?number|cc[_-]?num|credit[_-]?card|cardholder|\bcvc\b|\bcvv\b|\bcid\b|\bcsc\b|\bssn\b|social[_-]?security|routing[_-]?number|account[_-]?number|\biban\b|\bswift\b)/i;
@@ -204,7 +205,7 @@
     const type = String(info.type || "text").toLowerCase();
     if (SKIP_TYPES.has(type) && type !== "hidden") return true;
     if (type === "hidden") return true;
-    if (RECAPTCHA_RE.test(blobFromField(info))) return true;
+    if (CAPTCHA_RE.test(blobFromField(info))) return true;
     if (settings && settings.skipPasswords && type === "password") return true;
     if (settings && settings.skipPaymentAndSsn && isSensitive(info)) return true;
     if (!(settings && settings.fillSearchFields) && isSearchField(info)) return true;

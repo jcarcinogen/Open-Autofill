@@ -283,6 +283,24 @@ const gmailSelectAll = { ...gmailSelect, ariaLabel: "Select all conversations" }
 assert(M.shouldSkip(gmailSelectAll, settings), "skip gmail select all");
 assert(M.checkboxRole(nbc) === "agreement", "nbc still agreement");
 
+const captcha = {
+  tag: "input",
+  type: "text",
+  name: "captcha_answer",
+  id: "captcha_answer",
+  placeholder: "",
+  autocomplete: "",
+  label: "Type the characters seen in the picture above:",
+  ariaLabel: "",
+  value: "",
+  disabled: false,
+  readOnly: false
+};
+assert(M.shouldSkip(captcha, settings), "skip captcha field");
+assert(M.classifyFromText("captcha_answer") !== "address2", "captcha is not address2");
+assert(M.classifyFromText("Apt 2") === "address2", "apt still address2");
+assert(M.classifyFromText("Address 2 (optional)") === "address2", "address 2 label");
+
 const sharedSrc = fs.readFileSync(require("path").join(__dirname, "..", "src", "shared.js"), "utf8");
 vm.runInContext(sharedSrc, ctx);
 const FM = ctx.FM;

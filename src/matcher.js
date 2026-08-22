@@ -116,7 +116,27 @@
     return null;
   }
 
+  function isUiCheckbox(info) {
+    const aria = norm(info.ariaLabel);
+    const label = norm(info.label);
+    const name = String(info.name || "").toLowerCase();
+    const id = String(info.id || "").toLowerCase();
+    const blob = [aria, label, name, id].join(" ");
+    if (
+      /^(select|select all|select all conversations|select conversation|select message|select row)$/i.test(aria) ||
+      /^(select|select all)$/i.test(label)
+    ) {
+      return true;
+    }
+    if (/\b(select all conversations|select conversation|select message|star conversation|mark as (read|unread))\b/i.test(blob)) {
+      return true;
+    }
+    if (/\b(select|star|important)\b/i.test(name) && !AGREEMENT_RE.test(blob)) return true;
+    return false;
+  }
+
   function checkboxRole(info) {
+    if (isUiCheckbox(info)) return "ui";
     const text = [info.label, info.ariaLabel, info.value, info.name, info.id].map(norm).join(" ");
     if (!text) return "other";
     if (MARKETING_RE.test(text)) return "marketing";
@@ -188,6 +208,7 @@
     if (settings && settings.skipPasswords && type === "password") return true;
     if (settings && settings.skipPaymentAndSsn && isSensitive(info)) return true;
     if (!(settings && settings.fillSearchFields) && isSearchField(info)) return true;
+    if (type === "checkbox" && isUiCheckbox(info)) return true;
     if (info.disabled || info.readOnly) return true;
     return false;
   }
@@ -393,6 +414,7 @@
     radioMatches,
     isSensitive,
     isSearchField,
+    isUiCheckbox,
     shouldSkip,
     siteKey,
     siteKeys,

@@ -263,4 +263,32 @@ const gmail = {
 };
 assert(M.isSearchField(gmail), "gmail search");
 
+const gmailSelect = {
+  tag: "div",
+  type: "checkbox",
+  name: "",
+  id: "",
+  placeholder: "",
+  autocomplete: "",
+  label: "",
+  ariaLabel: "Select",
+  value: "",
+  disabled: false,
+  readOnly: false
+};
+assert(M.isUiCheckbox(gmailSelect), "gmail select is ui");
+assert(M.shouldSkip(gmailSelect, settings), "skip gmail select");
+assert(M.checkboxRole(gmailSelect) !== "agreement", "gmail select not agreement");
+const gmailSelectAll = { ...gmailSelect, ariaLabel: "Select all conversations" };
+assert(M.shouldSkip(gmailSelectAll, settings), "skip gmail select all");
+assert(M.checkboxRole(nbc) === "agreement", "nbc still agreement");
+
+const sharedSrc = fs.readFileSync(require("path").join(__dirname, "..", "src", "shared.js"), "utf8");
+vm.runInContext(sharedSrc, ctx);
+const FM = ctx.FM;
+assert(FM.isExcluded(settings, "mail.google.com"), "skip gmail host");
+assert(FM.isExcluded(settings, "outlook.office.com"), "skip outlook host");
+assert(!FM.isExcluded(settings, "nbc.com"), "do not skip contest host");
+assert(!FM.isExcluded({ ...settings, fillOnAppSites: true }, "mail.google.com"), "opt-in app sites");
+
 console.log("ok");

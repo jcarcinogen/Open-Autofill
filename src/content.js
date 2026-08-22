@@ -107,14 +107,17 @@
   }
 
   function nearbyConsentText(el) {
-    const parent = el.parentElement;
-    if (!parent) return "";
-    let t = (parent.innerText || parent.textContent || "").replace(/\s+/g, " ").trim();
-    if (t.length > 280) {
-      const next = el.nextElementSibling;
-      t = next ? (next.innerText || next.textContent || "").replace(/\s+/g, " ").trim() : t.slice(0, 280);
+    const next = el.nextElementSibling;
+    if (next) {
+      const t = (next.innerText || next.textContent || "").replace(/\s+/g, " ").trim();
+      if (t.length >= 8 && t.length <= 220) return t;
     }
-    return t;
+    const prev = el.previousElementSibling;
+    if (prev && !prev.querySelector("input, select, textarea")) {
+      const t = (prev.innerText || prev.textContent || "").replace(/\s+/g, " ").trim();
+      if (t.length >= 8 && t.length <= 220) return t;
+    }
+    return "";
   }
   function inspect(el) {
     const tag = (el.tagName || "").toLowerCase();

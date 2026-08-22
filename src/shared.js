@@ -41,6 +41,19 @@
     excludedHosts: []
   };
 
+  const DEFAULT_SKIP_HOSTS = [
+    "mail.google.com",
+    "inbox.google.com",
+    "gmail.com",
+    "outlook.live.com",
+    "outlook.office.com",
+    "outlook.office365.com",
+    "mail.yahoo.com",
+    "mail.aol.com",
+    "mail.proton.me",
+    "mail.icloud.com"
+  ];
+
   const emptyIdentity = () =>
     Object.fromEntries(IDENTITY_FIELDS.map((f) => [f.key, ""]));
 
@@ -92,6 +105,10 @@
 
   function isExcluded(settings, host) {
     const h = (host || "").toLowerCase();
+    if (!h) return false;
+    if (!(settings && settings.fillOnAppSites) && DEFAULT_SKIP_HOSTS.some((r) => h === r || h.endsWith("." + r))) {
+      return true;
+    }
     return (settings.excludedHosts || []).some((rule) => {
       const r = String(rule).trim().toLowerCase().replace(/^www\./, "");
       if (!r) return false;
@@ -106,6 +123,7 @@
   root.FM = {
     IDENTITY_FIELDS,
     DEFAULT_SETTINGS,
+    DEFAULT_SKIP_HOSTS,
     emptyIdentity,
     loadState,
     saveState,

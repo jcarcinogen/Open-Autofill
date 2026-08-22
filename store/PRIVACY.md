@@ -34,7 +34,7 @@ Open Autofill can run on websites so it can fill forms. Page contents are proces
 
 ## Contact
 
-Questions about this policy: [scottdangel@gmail.com](mailto:scottdangel@gmail.com)
+Questions about this policy: [scottdangel+openautofill@gmail.com](mailto:scottdangel+openautofill@gmail.com)
 
 ## Changes
 

@@ -52,5 +52,5 @@ Productivity / Tools
 - 1280×800 or 640×400 screenshots of the popup and a filled form (no personal email in the shot)
 - Optional 1400×560 promo tile using the green pencil icon
 - Public HTTPS privacy policy URL
-- Support email
+- Support email: scottdangel+openautofill@gmail.com
 - Do **not** zip/package until testing is done

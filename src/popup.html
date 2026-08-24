@@ -7,10 +7,16 @@
     <link rel="stylesheet" href="popup.css" />
   </head>
   <body>
-    <header>
-      <div>
-        <h1>Open Autofill</h1>
+    <header class="topbar">
+      <div class="app-heading">
+        <img src="../icons/icon32.png" width="32" height="32" alt="" />
+        <div>
+          <div class="title-row">
+            <h1>Open Autofill</h1>
+            <span id="version" class="version"></span>
+          </div>
         <p id="host" class="muted">—</p>
+        </div>
       </div>
       <label class="switch">
         <input type="checkbox" id="autoFill" />
@@ -22,12 +28,12 @@
       <button id="fill" class="primary">Fill this page</button>
       <button id="remember">Remember this page</button>
     </section>
-    <p id="status" class="status" hidden></p>
+    <p id="status" class="status" role="status" aria-live="polite" hidden></p>
 
     <section>
       <h2>Your usual answers</h2>
       <p class="muted small">
-        These travel across sites. Extra one-off fields are remembered per website.
+        These travel across sites. Type a different email or phone on one site and it stays specific to that site.
       </p>
       <div id="identity" class="grid"></div>
     </section>

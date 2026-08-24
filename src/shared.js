@@ -69,10 +69,13 @@
 
   function stripSemanticFromSites(sites, semantic) {
     const next = {};
+    const removesSemantic = (fieldSemantic) =>
+      fieldSemantic === semantic ||
+      (semantic === "birthday" && /^birthday(?:Month|Day|Year|-(?:month|day|year))$/.test(String(fieldSemantic || "")));
     for (const [host, rec] of Object.entries(sites || {})) {
       next[host] = {
         ...rec,
-        fields: (rec.fields || []).filter((f) => f.semantic !== semantic)
+        fields: (rec.fields || []).filter((f) => !removesSemantic(f.semantic))
       };
     }
     return next;
@@ -93,6 +96,15 @@
 
   async function saveState(partial) {
     await chrome.storage.local.set(partial);
+  }
+
+  function createSerialTaskQueue() {
+    let tail = Promise.resolve();
+    return (task) => {
+      const run = tail.then(task, task);
+      tail = run.catch(() => {});
+      return run;
+    };
   }
 
   function hostFromUrl(url) {
@@ -120,6 +132,12 @@
     return String(value || "").trim();
   }
 
+  function cleanNodeText(node) {
+    return String((node && (node.innerText || node.textContent)) || "")
+      .replace(/\s+/g, " ")
+      .trim();
+  }
+
   root.FM = {
     IDENTITY_FIELDS,
     DEFAULT_SETTINGS,
@@ -127,10 +145,12 @@
     emptyIdentity,
     loadState,
     saveState,
+    createSerialTaskQueue,
     setIdentityValue,
     stripSemanticFromSites,
     hostFromUrl,
     isExcluded,
-    normalizeHandle
+    normalizeHandle,
+    cleanNodeText
   };
 })(typeof globalThis !== "undefined" ? globalThis : self);

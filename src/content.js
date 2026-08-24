@@ -8,6 +8,7 @@
   let lastFillCount = 0;
   let learning = false;
   let filling = false;
+  const enqueueLearn = FM.createSerialTaskQueue();
 
   function ensureStyle() {
     if (document.getElementById(STYLE_ID)) return;
@@ -106,6 +107,32 @@
     return "";
   }
 
+  function findBirthdayContext(el) {
+    const isBirthdayText = (text) => /(date\s*of\s*birth|birth\s*date|\bbirthday\b|\bdob\b|\bbday\b)/i.test(text || "");
+    const fieldset = el.closest("fieldset");
+    if (fieldset) {
+      const text = FM.cleanNodeText(fieldset.querySelector(":scope > legend"));
+      if (isBirthdayText(text)) return text;
+    }
+    const group = el.closest('[role="group"]');
+    if (group) {
+      const text = (group.getAttribute("aria-label") || "").trim() || labelledByText(group);
+      if (isBirthdayText(text)) return text.replace(/\s+/g, " ");
+    }
+    let node = el.parentElement;
+    for (let i = 0; i < 4 && node; i += 1, node = node.parentElement) {
+      if (/^(FORM|BODY|HTML)$/.test(node.tagName || "")) break;
+      const selectCount = node.querySelectorAll("select").length;
+      if (selectCount < 2 || selectCount > 3) continue;
+      const heading = node.querySelector(
+        ":scope > legend, :scope > h1, :scope > h2, :scope > h3, :scope > h4, :scope > [class*='question'], :scope > [class*='label']"
+      );
+      const text = FM.cleanNodeText(heading);
+      if (isBirthdayText(text)) return text;
+    }
+    return "";
+  }
+
   function nearbyConsentText(el) {
     const next = el.nextElementSibling;
     if (next) {
@@ -148,7 +175,7 @@
       inSearchForm: !!(el.closest && el.closest('form[role="search"], [role="search"]')),
       value: type === "checkbox" || type === "radio" ? el.getAttribute("value") || el.value || "" : "",
       groupName: type === "radio" ? el.name || "" : "",
-      groupLabel: type === "radio" ? findQuestion(el) : "",
+      groupLabel: type === "radio" ? findQuestion(el) : tag === "select" ? findBirthdayContext(el) : "",
       disabled: !!el.disabled,
       readOnly: !!el.readOnly,
       checked
@@ -273,9 +300,8 @@
     }
 
     if (resolved.kind === "select") {
-      const want = String(resolved.value);
       const options = Array.from(el.options || []);
-      const match = options.find((o) => o.value === want) || options.find((o) => (o.text || "").trim() === want);
+      const match = options.find((o) => FMMatcher.selectOptionMatches(resolved, o));
       if (!match) return false;
       if (el.value === match.value) return false;
       if (!setNativeValue(el, match.value)) return false;
@@ -383,7 +409,7 @@
   function scheduleLearn(el) {
     if (!el || !el.matches || !el.matches("input, textarea, select, [role='checkbox'], [role='radio']")) return;
     window.setTimeout(() => {
-      rememberField(el).catch(() => {});
+      enqueueLearn(() => rememberField(el)).catch(() => {});
     }, 50);
   }
 
@@ -432,7 +458,7 @@
     document.addEventListener(
       "submit",
       () => {
-        rememberPage().catch(() => {});
+        enqueueLearn(() => rememberPage()).catch(() => {});
       },
       true
     );
@@ -455,7 +481,7 @@
       return true;
     }
     if (msg.type === "fm.remember") {
-      rememberPage().then(sendResponse);
+      enqueueLearn(() => rememberPage()).then(sendResponse);
       return true;
     }
     if (msg.type === "fm.ping") {

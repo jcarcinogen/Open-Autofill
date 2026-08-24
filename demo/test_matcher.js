@@ -17,6 +17,160 @@ assert(M.classifyAutocomplete("given-name") === "firstName", "ac first");
 assert(M.classifyFromText("instagram_handle") === "instagram", "ig");
 assert(M.classifyFromText("first_name") === "firstName", "fname");
 assert(M.classifyFromText("ZIP code") === "zip", "zip");
+
+const zipAsTel = {
+  tag: "input",
+  type: "tel",
+  name: "postal_zip",
+  id: "postal_zip",
+  placeholder: "ZIP Code",
+  autocomplete: "",
+  label: "ZIP Code",
+  ariaLabel: "",
+  value: "",
+  disabled: false,
+  readOnly: false
+};
+assert(M.classify(zipAsTel, {}).semantic === "zip", "zip meaning beats tel input type");
+const anonymousTel = { ...zipAsTel, name: "", id: "", placeholder: "", label: "" };
+assert(M.classify(anonymousTel, {}).semantic === "phone", "tel type remains a phone fallback");
+
+const dobMonth = {
+  tag: "select",
+  type: "select-one",
+  name: "month",
+  id: "field-month",
+  placeholder: "",
+  autocomplete: "",
+  label: "Month",
+  ariaLabel: "Month",
+  groupLabel: "Date of Birth",
+  value: "",
+  disabled: false,
+  readOnly: false
+};
+const dobDay = { ...dobMonth, name: "day", id: "field-day", label: "Day", ariaLabel: "Day" };
+const dobYear = { ...dobMonth, name: "year", id: "field-year", label: "Year", ariaLabel: "Year" };
+assert(M.classify(dobMonth, {}).semantic === "birthdayMonth", "DOB month select classification");
+assert(M.classify(dobDay, {}).semantic === "birthdayDay", "DOB day select classification");
+assert(M.classify(dobYear, {}).semantic === "birthdayYear", "DOB year select classification");
+assert(M.classifyAutocomplete("bday-month") === "birthdayMonth", "bday month autocomplete");
+assert(M.classifyAutocomplete("bday-day") === "birthdayDay", "bday day autocomplete");
+assert(M.classifyAutocomplete("bday-year") === "birthdayYear", "bday year autocomplete");
+assert(M.selectOptionMatches({ semantic: "birthdayMonth", value: "05" }, { value: "5", text: "May" }), "derived padded month matches unpadded option");
+assert(M.selectOptionMatches({ semantic: "birthdayMonth", value: "05" }, { value: "May", text: "May" }), "derived month matches month-name option");
+assert(M.selectOptionMatches({ semantic: "birthdayDay", value: "05" }, { value: "5", text: "5" }), "derived padded day matches unpadded option");
+assert(!M.selectOptionMatches({ semantic: null, value: "05" }, { value: "5", text: "5" }), "ordinary selects retain exact matching");
+
+const welchsDobMonth = {
+  ...dobMonth,
+  name: "dob_m",
+  id: "dob_m",
+  label: "Date of Birth",
+  ariaLabel: "",
+  groupLabel: ""
+};
+const welchsDobDay = { ...welchsDobMonth, name: "dob_d", id: "dob_d", label: "Date of Birth - Day" };
+const welchsDobYear = { ...welchsDobMonth, name: "dob_y", id: "dob_y", label: "Date of Birth - Year" };
+assert(M.classify(welchsDobMonth, {}).semantic === "birthdayMonth", "Welch's dob_m classifies as DOB month");
+assert(M.classify(welchsDobDay, {}).semantic === "birthdayDay", "Welch's dob_d classifies as DOB day");
+assert(M.classify(welchsDobYear, {}).semantic === "birthdayYear", "Welch's dob_y classifies as DOB year");
+assert(
+  M.classify({ ...welchsDobMonth, label: "", groupLabel: "" }, {}).semantic === "birthdayMonth",
+  "bare dob_m identifier classifies as DOB month"
+);
+assert(
+  M.classify({ ...welchsDobDay, label: "", groupLabel: "" }, {}).semantic === "birthdayDay",
+  "bare dob_d identifier classifies as DOB day"
+);
+assert(
+  M.classify({ ...welchsDobYear, label: "", groupLabel: "" }, {}).semantic === "birthdayYear",
+  "bare dob_y identifier classifies as DOB year"
+);
+const welchsEmail = { ...zipAsTel, type: "email", name: "email", id: "email", label: "Email Address" };
+assert(M.classify(welchsEmail, {}).semantic === "email", "Welch's email field classifies as email");
+const welchsRules = {
+  ...zipAsTel,
+  type: "checkbox",
+  name: "optin_rules",
+  id: "optin_rules",
+  label: "I have read and agree to the Official Rules.",
+  value: "yes",
+  checked: true
+};
+assert(M.classify(welchsRules, {}).semantic === "agreeToRules", "Welch's Official Rules checkbox classifies as agreement");
+let welchsIdentity = { birthday: "1978-02-13" };
+let welchsSiteFields = [];
+for (const [field, value] of [
+  [welchsDobMonth, "02"],
+  [welchsDobDay, "13"],
+  [welchsDobYear, "1978"],
+  [welchsEmail, "scott@example.com"],
+  [welchsRules, true]
+]) {
+  const learned = M.learnFromField(field, value, welchsIdentity, welchsSiteFields, {}, { overwriteIdentity: false });
+  welchsIdentity = learned.identity;
+  welchsSiteFields = learned.siteFields;
+}
+assert(welchsIdentity.email === "scott@example.com", "Welch's email is learned");
+assert(welchsIdentity.agreeToRules === "true", "Welch's Official Rules agreement is learned");
+assert(
+  ["birthdayMonth", "birthdayDay", "birthdayYear"].every((semantic) =>
+    welchsSiteFields.some((field) => field.semantic === semantic)
+  ),
+  "all Welch's DOB parts are learned per site"
+);
+const manuallyRestoredEmail = M.learnFromField(welchsEmail, "scott@example.com", {}, [], {}, {
+  overwriteIdentity: true,
+  cleared: { email: true }
+});
+assert(manuallyRestoredEmail.identity.email === "scott@example.com", "manual Remember restores a previously cleared email");
+assert(!manuallyRestoredEmail.cleared.email, "manual Remember removes the email clear marker");
+const manuallyRestoredDob = M.learnFromField(welchsDobMonth, "02", {}, [], {}, {
+  overwriteIdentity: true,
+  cleared: { birthday: true }
+});
+assert(!manuallyRestoredDob.cleared.birthday, "manual Remember makes explicitly entered DOB parts fillable again");
+const welchsLegacyDobFields = [
+  { key: "name:dob_m", aliases: ["id:dob_m", "label:date of birth"], semantic: "birthday", type: "select", value: "02" },
+  { key: "name:dob_d", aliases: ["id:dob_d", "label:date of birth - day"], semantic: "birthday", type: "select", value: "13" },
+  { key: "name:dob_y", aliases: ["id:dob_y", "label:date of birth - year"], semantic: "birthday", type: "select", value: "1978" }
+];
+assert(
+  M.resolveValue(welchsDobMonth, { birthday: "1978" }, welchsLegacyDobFields, {}).value === "02",
+  "legacy generic Welch's DOB month record remains readable"
+);
+assert(
+  M.resolveValue(welchsDobDay, { birthday: "1978" }, welchsLegacyDobFields, {}).value === "13",
+  "legacy generic Welch's DOB day record remains readable"
+);
+assert(
+  M.resolveValue(welchsDobYear, { birthday: "1978" }, welchsLegacyDobFields, {}).value === "1978",
+  "legacy generic Welch's DOB year record remains readable"
+);
+
+const learnedDobMonth = M.learnFromField(dobMonth, "May", { birthday: "1990-05-15" }, [], {}, {
+  overwriteIdentity: true
+});
+assert(!Object.prototype.hasOwnProperty.call(learnedDobMonth.identity, "birthdayMonth"), "DOB part does not create hidden identity");
+assert(learnedDobMonth.siteFields[0].value === "May", "DOB month is stored per site");
+assert(learnedDobMonth.siteFields[0].key === "dob:birthdayMonth", "DOB month uses a semantic-qualified site key");
+const resolvedDobMonth = M.resolveValue(dobMonth, learnedDobMonth.identity, learnedDobMonth.siteFields, {});
+assert(resolvedDobMonth.value === "May" && resolvedDobMonth.source === "site", "site DOB format beats derived identity part");
+const eventMonth = { ...dobMonth, id: "event-month", groupLabel: "Event date" };
+const unrelatedMonth = M.resolveValue(eventMonth, {}, learnedDobMonth.siteFields, {});
+assert(!unrelatedMonth.value, "DOB month does not fill an unrelated month select");
+const legacyDobMonth = [{ key: "name:month", aliases: ["label:month"], semantic: "birthday-month", value: "May" }];
+const unrelatedLegacyMonth = M.resolveValue(eventMonth, {}, legacyDobMonth, {});
+assert(!unrelatedLegacyMonth.value, "legacy DOB month does not fill an unrelated month select");
+const migratedDobMonth = M.learnFromField(dobMonth, "May", {}, legacyDobMonth, {}, { overwriteIdentity: true });
+assert(migratedDobMonth.siteFields.length === 1 && migratedDobMonth.siteFields[0].key === "dob:birthdayMonth", "legacy DOB part is replaced safely");
+const derivedDobDay = M.resolveValue(dobDay, { birthday: "1990-05-15" }, [], {});
+const derivedDobYear = M.resolveValue(dobYear, { birthday: "1990-05-15" }, [], {});
+assert(derivedDobDay.value === "15" && derivedDobDay.source === "identity", "derive DOB day from ISO birthday");
+assert(derivedDobYear.value === "1990" && derivedDobYear.source === "identity", "derive DOB year from ISO birthday");
+const clearedDobMonth = M.resolveValue(dobMonth, learnedDobMonth.identity, learnedDobMonth.siteFields, {}, { birthday: true });
+assert(!clearedDobMonth.value, "cleared birthday suppresses remembered DOB parts");
 assert(
   M.isSensitive({
     type: "password",
@@ -57,6 +211,71 @@ const emailInfo = {
 };
 const resolved = M.resolveValue(emailInfo, { email: "a@b.com" }, [], settings);
 assert(resolved.semantic === "email" && resolved.value === "a@b.com" && resolved.source === "identity", "resolve email");
+
+const bestBuyEmail = {
+  ...emailInfo,
+  id: "use_your_my_best_buy_account_email_for_e",
+  name: "",
+  autocomplete: "",
+  label: "Use your My Best Buy account email for entry."
+};
+const bestBuyLearned = M.learnFromField(
+  bestBuyEmail,
+  "site@example.com",
+  { email: "usual@example.com" },
+  [],
+  settings,
+  { overwriteIdentity: false }
+);
+assert(bestBuyLearned.identity.email === "usual@example.com", "Best Buy email does not replace the usual email");
+assert(bestBuyLearned.siteFields[0].override === true, "Best Buy alternate email is marked as a site override");
+const bestBuyResolved = M.resolveValue(bestBuyEmail, bestBuyLearned.identity, bestBuyLearned.siteFields, settings);
+assert(
+  bestBuyResolved.value === "site@example.com" && bestBuyResolved.source === "site",
+  "Best Buy site email beats the usual email"
+);
+const bestBuyRemembered = M.learnFromField(
+  bestBuyEmail,
+  "site@example.com",
+  { email: "usual@example.com" },
+  [],
+  settings,
+  { overwriteIdentity: true }
+);
+assert(bestBuyRemembered.identity.email === "usual@example.com", "manual Remember preserves the usual email");
+assert(bestBuyRemembered.siteFields[0].override === true, "manual Remember stores the Best Buy override");
+const bestBuyReset = M.learnFromField(
+  bestBuyEmail,
+  "usual@example.com",
+  bestBuyLearned.identity,
+  bestBuyLearned.siteFields,
+  settings,
+  { overwriteIdentity: false }
+);
+assert(!bestBuyReset.siteFields[0].override, "entering the usual email removes the Best Buy override");
+assert(
+  M.resolveValue(bestBuyEmail, bestBuyReset.identity, bestBuyReset.siteFields, settings).source === "identity",
+  "Best Buy returns to the usual email after its override is removed"
+);
+
+const maverikPhone = {
+  ...emailInfo,
+  type: "tel",
+  name: "phoneNumber",
+  id: "",
+  autocomplete: "tel",
+  label: "Phone Number (Format: 1234567890)"
+};
+const maverikLearned = M.learnFromField(maverikPhone, "3605550100", { phone: "2065550100" }, [], settings, {
+  overwriteIdentity: false
+});
+assert(maverikLearned.identity.phone === "2065550100", "Maverik phone does not replace the usual phone");
+assert(maverikLearned.siteFields[0].override === true, "Maverik alternate phone is marked as a site override");
+const maverikResolved = M.resolveValue(maverikPhone, maverikLearned.identity, maverikLearned.siteFields, settings);
+assert(
+  maverikResolved.value === "3605550100" && maverikResolved.source === "site",
+  "Maverik site phone beats the usual phone"
+);
 
 const flavor = {
   tag: "input",
@@ -233,6 +452,10 @@ const noOverwrite = M.learnFromField(addr2, "hnmgd", { address2: "naphj" }, [], 
 assert(noOverwrite.identity.address2 === "naphj", "auto-learn does not overwrite");
 const blocked = M.learnFromField(addr2, "hnmgd", { address2: "" }, [], settings, { overwriteIdentity: false, cleared: { address2: true } });
 assert(!blocked.identity.address2, "cleared blocks auto-learn");
+const manualAddressUpdate = M.learnFromField(addr2, "new apartment", { address2: "old apartment" }, [], settings, {
+  overwriteIdentity: true
+});
+assert(manualAddressUpdate.identity.address2 === "new apartment", "manual Remember still updates non-contact identity fields");
 
 const googleQ = {
   tag: "textarea",
@@ -304,9 +527,27 @@ assert(M.classifyFromText("Address 2 (optional)") === "address2", "address 2 lab
 const sharedSrc = fs.readFileSync(require("path").join(__dirname, "..", "src", "shared.js"), "utf8");
 vm.runInContext(sharedSrc, ctx);
 const FM = ctx.FM;
+assert(FM.cleanNodeText(null) === "", "missing DOM context cleans to an empty string");
+assert(
+  FM.cleanNodeText({ textContent: "  Date   of Birth  " }) === "Date of Birth",
+  "DOM context text is normalized"
+);
 assert(FM.isExcluded(settings, "mail.google.com"), "skip gmail host");
 assert(FM.isExcluded(settings, "outlook.office.com"), "skip outlook host");
 assert(!FM.isExcluded(settings, "nbc.com"), "do not skip contest host");
 assert(!FM.isExcluded({ ...settings, fillOnAppSites: true }, "mail.google.com"), "opt-in app sites");
+const dobSites = {
+  "example.com": {
+    fields: [
+      { key: "name:birthday", semantic: "birthday", value: "1990-05-15" },
+      { key: "name:month", semantic: "birthdayMonth", value: "May" },
+      { key: "name:day", semantic: "birthdayDay", value: "15" },
+      { key: "name:legacy-month", semantic: "birthday-month", value: "May" },
+      { key: "name:favorite", semantic: null, value: "blue" }
+    ]
+  }
+};
+const strippedDobSites = FM.stripSemanticFromSites(dobSites, "birthday");
+assert(strippedDobSites["example.com"].fields.length === 1, "clearing birthday removes all DOB parts");
 
 console.log("ok");

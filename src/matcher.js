@@ -21,7 +21,9 @@
     country: "country",
     "country-name": "country",
     bday: "birthday",
-    "bday-day": "birthday",
+    "bday-day": "birthdayDay",
+    "bday-month": "birthdayMonth",
+    "bday-year": "birthdayYear",
     organization: "company",
     url: "website",
     "home page": "website",
@@ -89,7 +91,24 @@
       info.label,
       info.ariaLabel,
       info.value,
+      info.groupLabel,
       info.type
+    ]
+      .map(norm)
+      .filter(Boolean)
+      .join(" | ");
+  }
+
+  function descriptiveBlob(info) {
+    return [
+      info.autocomplete,
+      info.name,
+      info.id,
+      info.placeholder,
+      info.label,
+      info.ariaLabel,
+      info.value,
+      info.groupLabel
     ]
       .map(norm)
       .filter(Boolean)
@@ -115,6 +134,66 @@
     if (AUTOCOMPLETE_MAP[last]) return AUTOCOMPLETE_MAP[last];
     if (AUTOCOMPLETE_MAP[tokens.join(" ")]) return AUTOCOMPLETE_MAP[tokens.join(" ")];
     return null;
+  }
+
+  function classifyBirthdayPart(info) {
+    const context = descriptiveBlob(info);
+    if (!/(birth|\bdob\b|\bbday\b|\bdob[_-](?:m|d|y)\b)/i.test(context)) return null;
+    const component = [info.autocomplete, info.name, info.id, info.placeholder, info.label, info.ariaLabel]
+      .map(norm)
+      .filter(Boolean)
+      .join(" | ");
+    if (/(^|[_\s-])month($|[_\s-])|\bmm\b|\bdob[_-]m\b/i.test(component)) return "birthdayMonth";
+    if (/(^|[_\s-])day($|[_\s-])|\bdd\b|\bdob[_-]d\b/i.test(component)) return "birthdayDay";
+    if (/(^|[_\s-])year($|[_\s-])|\byyyy\b|\bdob[_-]y\b/i.test(component)) return "birthdayYear";
+    return null;
+  }
+
+  function classifyInputType(type) {
+    const t = String(type || "").toLowerCase();
+    if (t === "email") return "email";
+    if (t === "tel") return "phone";
+    if (t === "url") return "website";
+    return null;
+  }
+
+  function normalizeSemantic(semantic) {
+    const aliases = {
+      "birthday-month": "birthdayMonth",
+      "birthday-day": "birthdayDay",
+      "birthday-year": "birthdayYear"
+    };
+    return aliases[semantic] || semantic || null;
+  }
+
+  function isBirthdayPartSemantic(semantic) {
+    return /^birthday(Month|Day|Year)$/.test(normalizeSemantic(semantic) || "");
+  }
+
+  function selectOptionMatches(resolved, option) {
+    const want = norm(resolved && resolved.value);
+    const optionValue = norm(option && option.value);
+    const optionText = norm(option && option.text);
+    if (optionValue === want || optionText === want) return true;
+    const semantic = normalizeSemantic(resolved && resolved.semantic);
+    if (!isBirthdayPartSemantic(semantic) || !/^\d+$/.test(want)) return false;
+    const wantedNumber = Number(want);
+    if (
+      (/^\d+$/.test(optionValue) && Number(optionValue) === wantedNumber) ||
+      (/^\d+$/.test(optionText) && Number(optionText) === wantedNumber)
+    ) {
+      return true;
+    }
+    if (semantic !== "birthdayMonth" || wantedNumber < 1 || wantedNumber > 12) return false;
+    const monthNames = [
+      "january", "february", "march", "april", "may", "june",
+      "july", "august", "september", "october", "november", "december"
+    ];
+    const month = monthNames[wantedNumber - 1];
+    return [optionValue, optionText].some((candidate) => {
+      const lower = candidate.toLowerCase();
+      return lower === month || lower === month.slice(0, 3);
+    });
   }
 
   function isUiCheckbox(info) {
@@ -214,9 +293,13 @@
     return false;
   }
 
-  function siteKeys(info) {
+  function siteKeys(info, semantic) {
     const keys = [];
     const kind = String(info.type || "").toLowerCase();
+    const normalizedSemantic = normalizeSemantic(
+      semantic || classifyAutocomplete(info.autocomplete) || classifyBirthdayPart(info)
+    );
+    if (isBirthdayPartSemantic(normalizedSemantic)) keys.push("dob:" + normalizedSemantic);
     const push = (prefix, raw, allowVolatile) => {
       const v = norm(raw);
       if (!v) return;
@@ -244,8 +327,8 @@
     return keys;
   }
 
-  function siteKey(info) {
-    return siteKeys(info)[0] || "";
+  function siteKey(info, semantic) {
+    return siteKeys(info, semantic)[0] || "";
   }
 
   function fieldKind(info) {
@@ -268,13 +351,17 @@
         ? kind === "checkbox" && role === "agreement"
           ? "agreeToRules"
           : null
-        : classifyAutocomplete(info.autocomplete) || classifyFromText(blobFromField(info));
+        : classifyAutocomplete(info.autocomplete) ||
+          classifyBirthdayPart(info) ||
+          classifyFromText(descriptiveBlob(info)) ||
+          classifyInputType(info.type);
+    const keys = siteKeys(info, semantic);
     return {
       skip,
       sensitive,
       semantic,
-      siteKey: siteKey(info),
-      siteKeys: siteKeys(info),
+      siteKey: keys[0] || "",
+      siteKeys: keys,
       kind,
       role
     };
@@ -287,11 +374,25 @@
     return String(raw).trim();
   }
 
-  function lookupSiteValue(siteFields, keys) {
+  function semanticValuesEqual(semantic, left, right) {
+    const a = String(left == null ? "" : left).trim();
+    const b = String(right == null ? "" : right).trim();
+    if (semantic === "email") return a.toLowerCase() === b.toLowerCase();
+    if (semantic === "phone") return a.replace(/\D/g, "") === b.replace(/\D/g, "");
+    return a === b;
+  }
+
+  function lookupSiteValue(siteFields, keys, semantic) {
     if (!Array.isArray(siteFields) || !keys || !keys.length) return null;
+    const wantedSemantic = normalizeSemantic(semantic);
     return (
-      siteFields.find((f) => keys.includes(f.key) || (f.aliases || []).some((alias) => keys.includes(alias))) ||
-      null
+      siteFields.find((f) => {
+        const keyMatches = keys.includes(f.key) || (f.aliases || []).some((alias) => keys.includes(alias));
+        const storedSemantic = normalizeSemantic(f.semantic);
+        const semanticMatches = storedSemantic === wantedSemantic;
+        const legacyBirthdayPart = isBirthdayPartSemantic(wantedSemantic) && storedSemantic === "birthday";
+        return keyMatches && (semanticMatches || legacyBirthdayPart);
+      }) || null
     );
   }
 
@@ -304,7 +405,7 @@
       if (isCheckedValue(agreed)) return { ...meta, value: "true", source: "identity" };
     }
 
-    const site = lookupSiteValue(siteFields, meta.siteKeys);
+    const site = lookupSiteValue(siteFields, meta.siteKeys, meta.semantic);
     if (meta.kind === "radio") {
       if (site && radioMatches(info, site)) {
         return {
@@ -317,8 +418,25 @@
       return { ...meta, value: "", source: null };
     }
 
+    if (isBirthdayPartSemantic(meta.semantic)) {
+      if (cleared && cleared.birthday) return { ...meta, value: "", source: null };
+      if (site && site.value !== undefined && site.value !== "") {
+        return { ...meta, value: site.value, optionLabel: site.optionLabel, source: "site" };
+      }
+      const birthday = identityValue(identity, "birthday");
+      const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(birthday);
+      if (match) {
+        const part = { birthdayYear: match[1], birthdayMonth: match[2], birthdayDay: match[3] }[meta.semantic];
+        return { ...meta, value: part || "", source: part ? "identity" : null };
+      }
+      return { ...meta, value: "", source: null };
+    }
+
     if (meta.semantic && meta.kind !== "checkbox") {
       if (cleared && cleared[meta.semantic]) return { ...meta, value: "", source: null };
+      if (site && site.override === true && site.value !== undefined && site.value !== "") {
+        return { ...meta, value: site.value, optionLabel: site.optionLabel, source: "site" };
+      }
       const value = identityValue(identity, meta.semantic);
       if (value) return { ...meta, value, source: "identity" };
       return { ...meta, value: "", source: null };
@@ -357,14 +475,20 @@
 
     let learned = null;
     const checked = isCheckedValue(value);
+    if (overwriteIdentity && isBirthdayPartSemantic(meta.semantic)) delete cleared.birthday;
     if (meta.kind === "checkbox" && meta.role === "agreement" && checked) {
       nextIdentity.agreeToRules = "true";
       delete cleared.agreeToRules;
       learned = { target: "identity", key: "agreeToRules", value: "true" };
-    } else if (meta.semantic && (meta.kind === "text" || meta.kind === "select")) {
+    } else if (
+      meta.semantic &&
+      !isBirthdayPartSemantic(meta.semantic) &&
+      (meta.kind === "text" || meta.kind === "select")
+    ) {
       const existing = identityValue(identity, meta.semantic);
       const blocked = !!cleared[meta.semantic];
-      if (!blocked && (overwriteIdentity || !existing)) {
+      const supportsSiteOverride = meta.semantic === "email" || meta.semantic === "phone";
+      if ((!blocked || overwriteIdentity) && (!existing || (overwriteIdentity && !supportsSiteOverride))) {
         nextIdentity[meta.semantic] = trimmed;
         delete cleared[meta.semantic];
         learned = { target: "identity", key: meta.semantic, value: trimmed };
@@ -374,7 +498,10 @@
     const keys = meta.siteKeys || [];
     const existingIdx = keys.length
       ? nextSite.findIndex(
-          (f) => keys.includes(f.key) || (f.aliases || []).some((alias) => keys.includes(alias))
+          (f) =>
+            keys.includes(f.key) ||
+            (f.aliases || []).some((alias) => keys.includes(alias)) ||
+            (isBirthdayPartSemantic(meta.semantic) && normalizeSemantic(f.semantic) === normalizeSemantic(meta.semantic))
         )
       : -1;
 
@@ -385,6 +512,12 @@
     }
 
     if (keys.length) {
+      const usualValue = meta.semantic ? identityValue(identity, meta.semantic) : "";
+      const siteOverride =
+        (meta.semantic === "email" || meta.semantic === "phone") &&
+        meta.kind !== "checkbox" &&
+        !!usualValue &&
+        !semanticValuesEqual(meta.semantic, usualValue, trimmed);
       const rec = {
         key: keys[0],
         aliases: keys.slice(1),
@@ -396,6 +529,7 @@
         role: meta.role || null,
         label: info.label || info.placeholder || info.name || info.id || keys[0]
       };
+      if (siteOverride) rec.override = true;
       if (existingIdx >= 0) nextSite[existingIdx] = rec;
       else nextSite.push(rec);
       if (!learned) learned = { target: "site", key: rec.key, value: rec.value };
@@ -422,6 +556,7 @@
     resolveValue,
     learnFromField,
     blobFromField,
-    isCheckedValue
+    isCheckedValue,
+    selectOptionMatches
   };
 })(typeof globalThis !== "undefined" ? globalThis : self);

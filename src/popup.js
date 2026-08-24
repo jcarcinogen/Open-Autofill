@@ -2,6 +2,7 @@ const hostEl = document.getElementById("host");
 const statusEl = document.getElementById("status");
 const identityEl = document.getElementById("identity");
 const autoFillEl = document.getElementById("autoFill");
+document.getElementById("version").textContent = `v${chrome.runtime.getManifest().version}`;
 
 function showStatus(text, err) {
   statusEl.hidden = false;

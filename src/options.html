@@ -8,9 +8,17 @@
   </head>
   <body>
     <main>
-      <header>
-        <h1>Open Autofill</h1>
-        <p>Always free. Local only. Your answers never go to the cloud.</p>
+      <header class="app-header">
+        <div class="app-heading">
+          <img src="../icons/icon48.png" width="44" height="44" alt="" />
+          <div>
+            <div class="title-row">
+              <h1>Open Autofill</h1>
+              <span id="version" class="version"></span>
+            </div>
+            <p>Always free. Local only. Your answers never go to the cloud.</p>
+          </div>
+        </div>
         <p class="muted"><a href="privacy.html">Privacy policy</a></p>
       </header>
 
@@ -27,7 +35,7 @@
 
       <section>
         <h2>Identity profile</h2>
-        <p class="muted">Used on every site when the field looks like email, name, address, Instagram, etc.</p>
+        <p class="muted">Used by default. If you enter a different email or phone on one site, that site-specific answer takes priority there.</p>
         <div id="identity" class="grid"></div>
       </section>
 
@@ -39,7 +47,7 @@
 
       <section>
         <h2>Remembered site fields</h2>
-        <p class="muted">Odd extra questions live here, keyed to the website.</p>
+        <p class="muted">One-off questions and site-specific overrides live here, keyed to the website.</p>
         <div id="sites"></div>
       </section>
 
@@ -55,7 +63,7 @@
             <input type="file" id="import" accept="application/json" />
           </label>
         </div>
-        <p id="backupStatus" class="muted" hidden></p>
+        <p id="backupStatus" class="muted" role="status" aria-live="polite" hidden></p>
       </section>
 
       <section>

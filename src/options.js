@@ -1,6 +1,7 @@
 const identityEl = document.getElementById("identity");
 const sitesEl = document.getElementById("sites");
 const excludedEl = document.getElementById("excluded");
+document.getElementById("version").textContent = `v${chrome.runtime.getManifest().version}`;
 
 const SETTING_IDS = ["autoFill", "autoLearn", "highlightFilled", "skipPasswords", "skipPaymentAndSsn", "fillSearchFields"];
 
@@ -61,7 +62,13 @@ async function render() {
     const list = document.createElement("ul");
     for (const field of rec.fields || []) {
       const li = document.createElement("li");
-      li.textContent = `${field.label || field.key}: ${field.value}`;
+      li.append(document.createTextNode(`${field.label || field.key}: ${field.value}`));
+      if (field.override === true) {
+        const badge = document.createElement("span");
+        badge.className = "override-badge";
+        badge.textContent = "Site override";
+        li.append(document.createTextNode(" "), badge);
+      }
       list.append(li);
     }
     if (!list.childElementCount) {

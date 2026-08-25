@@ -13,6 +13,8 @@
     { key: "zip", label: "ZIP / postal", placeholder: "98204" },
     { key: "country", label: "Country", placeholder: "United States" },
     { key: "instagram", label: "Instagram", placeholder: "@handle" },
+    { key: "threads", label: "Threads", placeholder: "@handle" },
+    { key: "bluesky", label: "Bluesky", placeholder: "handle.bsky.social" },
     { key: "twitter", label: "X / Twitter", placeholder: "@handle" },
     { key: "tiktok", label: "TikTok", placeholder: "@handle" },
     { key: "facebook", label: "Facebook", placeholder: "profile name or URL" },

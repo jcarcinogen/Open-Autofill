@@ -33,6 +33,11 @@
   const SEMANTIC_PATTERNS = [
     { key: "email", re: /(e[-\s]?mail|mailaddress|emailaddress)/i },
     { key: "instagram", re: /(instagram|\binsta\b|\big[_-]?handle\b|\big\b)/i },
+    {
+      key: "threads",
+      re: /(threads\.net|threads[_-\s]?(handle|username|profile)|(handle|username|profile)(\s+on)?\s+threads|(^|\|)\s*threads\s*(\||$))/i
+    },
+    { key: "bluesky", re: /(\bblue[_-\s]?sky\b|\bbsky\b|bsky\.app)/i },
     { key: "twitter", re: /(twitter|\bx[_-]?handle\b|\btwitter[_-]?handle\b)/i },
     { key: "tiktok", re: /tik[_-]?tok/i },
     { key: "facebook", re: /face[_-]?book/i },
@@ -307,8 +312,8 @@
       keys.push(prefix + (prefix.startsWith("label") || prefix.startsWith("aria") || prefix.startsWith("ph") ? v.toLowerCase() : v));
     };
     if (kind === "radio") {
-      push("radiogroup:", info.groupLabel, true);
       push("radioname:", info.groupName || info.name, false);
+      push("radiogroup:", info.groupLabel, true);
       push("label:", info.label, true);
       return keys;
     }
@@ -382,12 +387,22 @@
     return a === b;
   }
 
-  function lookupSiteValue(siteFields, keys, semantic) {
+  function siteFieldKeyMatches(field, keys, kind) {
+    const storedKeys = [field.key, ...(field.aliases || [])].filter(Boolean);
+    if (kind === "radio") {
+      const currentName = keys.find((key) => key.startsWith("radioname:"));
+      const storedName = storedKeys.find((key) => key.startsWith("radioname:"));
+      if (currentName && storedName) return currentName === storedName;
+    }
+    return storedKeys.some((key) => keys.includes(key));
+  }
+
+  function lookupSiteValue(siteFields, keys, semantic, kind) {
     if (!Array.isArray(siteFields) || !keys || !keys.length) return null;
     const wantedSemantic = normalizeSemantic(semantic);
     return (
       siteFields.find((f) => {
-        const keyMatches = keys.includes(f.key) || (f.aliases || []).some((alias) => keys.includes(alias));
+        const keyMatches = siteFieldKeyMatches(f, keys, kind);
         const storedSemantic = normalizeSemantic(f.semantic);
         const semanticMatches = storedSemantic === wantedSemantic;
         const legacyBirthdayPart = isBirthdayPartSemantic(wantedSemantic) && storedSemantic === "birthday";
@@ -405,7 +420,7 @@
       if (isCheckedValue(agreed)) return { ...meta, value: "true", source: "identity" };
     }
 
-    const site = lookupSiteValue(siteFields, meta.siteKeys, meta.semantic);
+    const site = lookupSiteValue(siteFields, meta.siteKeys, meta.semantic, meta.kind);
     if (meta.kind === "radio") {
       if (site && radioMatches(info, site)) {
         return {
@@ -499,8 +514,7 @@
     const existingIdx = keys.length
       ? nextSite.findIndex(
           (f) =>
-            keys.includes(f.key) ||
-            (f.aliases || []).some((alias) => keys.includes(alias)) ||
+            siteFieldKeyMatches(f, keys, meta.kind) ||
             (isBirthdayPartSemantic(meta.semantic) && normalizeSemantic(f.semantic) === normalizeSemantic(meta.semantic))
         )
       : -1;

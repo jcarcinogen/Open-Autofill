@@ -15,6 +15,10 @@ const assert = (cond, msg) => {
 assert(M.classifyAutocomplete("email") === "email", "ac email");
 assert(M.classifyAutocomplete("given-name") === "firstName", "ac first");
 assert(M.classifyFromText("instagram_handle") === "instagram", "ig");
+assert(M.classifyFromText("Threads username") === "threads", "threads handle");
+assert(M.classifyFromText("Bluesky / Bsky handle") === "bluesky", "bluesky handle");
+assert(M.classifyFromText("worker threads") !== "threads", "worker threads are not a social handle");
+assert(M.classifyFromText("number of threads") !== "threads", "thread-count fields are not a social handle");
 assert(M.classifyFromText("first_name") === "firstName", "fname");
 assert(M.classifyFromText("ZIP code") === "zip", "zip");
 
@@ -413,6 +417,45 @@ assert(!fillMonth.value, "do not fill other radio");
 assert(M.radioMatches(undecided, learnedRadio.siteFields[0]), "match undecided");
 assert(!M.radioMatches(month, learnedRadio.siteFields[0]), "no match month");
 
+const matrixBase = {
+  ...radioBase,
+  groupLabel: "Brand 1 2 3 4 5 6 7 8 9 10",
+  label: ""
+};
+const alfaTwo = { ...matrixBase, name: "RecommendRateAlfa", groupName: "RecommendRateAlfa", id: "alfa-2", value: "2" };
+const alfaTen = { ...alfaTwo, id: "alfa-10", value: "10" };
+const jeepNine = { ...matrixBase, name: "RecommendRateJeep", groupName: "RecommendRateJeep", id: "jeep-9", value: "9" };
+const jeepTen = { ...jeepNine, id: "jeep-10", value: "10" };
+const learnedAlfa = M.learnFromField(alfaTwo, "2", {}, [], settings);
+const learnedMatrix = M.learnFromField(jeepNine, "9", {}, learnedAlfa.siteFields, settings);
+assert(learnedMatrix.siteFields.length === 2, "radio matrix keeps one record per row");
+assert(
+  learnedMatrix.siteFields.some((field) => field.key === "radioname:RecommendRateAlfa") &&
+    learnedMatrix.siteFields.some((field) => field.key === "radioname:RecommendRateJeep"),
+  "radio matrix uses each row's stable group name"
+);
+assert(M.resolveValue(alfaTwo, {}, learnedMatrix.siteFields, settings).source === "site", "restore Alfa Romeo rating");
+assert(!M.resolveValue(alfaTen, {}, learnedMatrix.siteFields, settings).value, "do not force the last column for Alfa Romeo");
+assert(M.resolveValue(jeepNine, {}, learnedMatrix.siteFields, settings).source === "site", "restore Jeep rating");
+assert(!M.resolveValue(jeepTen, {}, learnedMatrix.siteFields, settings).value, "do not force the last column for Jeep");
+const legacyJeepMatrix = [
+  {
+    key: "radiogroup:Brand 1 2 3 4 5 6 7 8 9 10",
+    aliases: ["radioname:RecommendRateJeep"],
+    type: "radio",
+    value: "9",
+    optionLabel: "",
+    optionValue: "9"
+  }
+];
+assert(!M.resolveValue(alfaTwo, {}, legacyJeepMatrix, settings).value, "legacy Jeep matrix record cannot fill Alfa Romeo");
+assert(M.resolveValue(jeepNine, {}, legacyJeepMatrix, settings).source === "site", "legacy Jeep matrix record remains readable");
+const migratedLegacyJeep = M.learnFromField(jeepNine, "9", {}, legacyJeepMatrix, settings);
+assert(
+  migratedLegacyJeep.siteFields.length === 1 && migratedLegacyJeep.siteFields[0].key === "radioname:RecommendRateJeep",
+  "legacy Jeep matrix record migrates to its stable row name"
+);
+
 const nbc = {
   tag: "input",
   type: "checkbox",
@@ -527,6 +570,8 @@ assert(M.classifyFromText("Address 2 (optional)") === "address2", "address 2 lab
 const sharedSrc = fs.readFileSync(require("path").join(__dirname, "..", "src", "shared.js"), "utf8");
 vm.runInContext(sharedSrc, ctx);
 const FM = ctx.FM;
+assert(FM.IDENTITY_FIELDS.some((field) => field.key === "threads"), "identity profile includes Threads");
+assert(FM.IDENTITY_FIELDS.some((field) => field.key === "bluesky"), "identity profile includes Bluesky");
 assert(FM.cleanNodeText(null) === "", "missing DOM context cleans to an empty string");
 assert(
   FM.cleanNodeText({ textContent: "  Date   of Birth  " }) === "Date of Birth",

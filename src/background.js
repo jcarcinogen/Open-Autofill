@@ -41,6 +41,8 @@ chrome.runtime.onInstalled.addListener(async () => {
       zip: "",
       country: "",
       instagram: "",
+      threads: "",
+      bluesky: "",
       twitter: "",
       tiktok: "",
       facebook: "",

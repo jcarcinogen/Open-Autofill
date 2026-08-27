@@ -1,5 +1,7 @@
 # Open Autofill
 
+[![ko-fi](https://ko-fi.com/img/githubbutton_sm.svg)](https://ko-fi.com/T2J625IUHY)
+
 A Chrome extension that remembers what you type in forms and fills it again the next time. Local only. **No daily cap. Always free.**
 
 This is original software for your own browser profile. It is not Lightning Autofill and does not use their code.
@@ -50,7 +52,7 @@ Visit [http://127.0.0.1:8765/form.html](http://127.0.0.1:8765/form.html) **in Ch
 
 Open Autofill is free and always will be. Tips are optional:
 
-[ko-fi.com/scottangel](https://ko-fi.com/scottangel)
+[![ko-fi](https://ko-fi.com/img/githubbutton_sm.svg)](https://ko-fi.com/T2J625IUHY)
 
 ## Tests
 

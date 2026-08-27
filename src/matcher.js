@@ -30,6 +30,24 @@
     sex: "gender"
   };
 
+  const REGION_CODES = {
+    alabama: "AL", alaska: "AK", arizona: "AZ", arkansas: "AR", california: "CA", colorado: "CO",
+    connecticut: "CT", delaware: "DE", "district of columbia": "DC", florida: "FL", georgia: "GA",
+    hawaii: "HI", idaho: "ID", illinois: "IL", indiana: "IN", iowa: "IA", kansas: "KS", kentucky: "KY",
+    louisiana: "LA", maine: "ME", maryland: "MD", massachusetts: "MA", michigan: "MI", minnesota: "MN",
+    mississippi: "MS", missouri: "MO", montana: "MT", nebraska: "NE", nevada: "NV", "new hampshire": "NH",
+    "new jersey": "NJ", "new mexico": "NM", "new york": "NY", "north carolina": "NC", "north dakota": "ND",
+    ohio: "OH", oklahoma: "OK", oregon: "OR", pennsylvania: "PA", "rhode island": "RI",
+    "south carolina": "SC", "south dakota": "SD", tennessee: "TN", texas: "TX", utah: "UT", vermont: "VT",
+    virginia: "VA", washington: "WA", "west virginia": "WV", wisconsin: "WI", wyoming: "WY",
+    "american samoa": "AS", guam: "GU", "northern mariana islands": "MP", "puerto rico": "PR",
+    "u.s. minor outlying islands": "UM", "united states minor outlying islands": "UM",
+    "us virgin islands": "VI", "u.s. virgin islands": "VI", "united states virgin islands": "VI",
+    alberta: "AB", "british columbia": "BC", manitoba: "MB", "new brunswick": "NB",
+    "newfoundland and labrador": "NL", "northwest territories": "NT", "nova scotia": "NS", nunavut: "NU",
+    ontario: "ON", "prince edward island": "PE", quebec: "QC", saskatchewan: "SK", yukon: "YT"
+  };
+
   const SEMANTIC_PATTERNS = [
     { key: "email", re: /(e[-\s]?mail|mailaddress|emailaddress)/i },
     { key: "instagram", re: /(instagram|\binsta\b|\big[_-]?handle\b|\big\b)/i },
@@ -48,7 +66,7 @@
     { key: "address2", re: /(address[_-\s]?line[_-\s]?2|addr(?:ess)?[\s_-]?2|\bapt\.?\b|\bsuite\b|\bunit\b|\bapartment\b)/i },
     { key: "address1", re: /(street[_-\s]?address|address[_-\s]?line[_-\s]?1|addr(?:ess)?[_-]?1|\bstreet\b|\baddress\b)/i },
     { key: "city", re: /(\bcity\b|\btown\b)/i },
-    { key: "state", re: /(\bstate\b|\bprovince\b|\bregion\b)/i },
+    { key: "state", re: /(^|[^a-z0-9])(state|province|region)($|[^a-z0-9])/i },
     { key: "zip", re: /(zip[_-\s]?code|postal|_zip\b|\bzip\b|post[_-\s]?code)/i },
     { key: "country", re: /\bcountry\b/i },
     { key: "birthday", re: /(birth[_-\s]?date|date[_-\s]?of[_-\s]?birth|\bdob\b|\bbirthday\b|\bbday\b)/i },
@@ -181,6 +199,14 @@
     const optionText = norm(option && option.text);
     if (optionValue === want || optionText === want) return true;
     const semantic = normalizeSemantic(resolved && resolved.semantic);
+    if (semantic === "state") {
+      const regionCode = (value) => {
+        const lower = norm(value).toLowerCase().replace(/\s+/g, " ");
+        return REGION_CODES[lower] || (/^[a-z]{2}$/i.test(lower) ? lower.toUpperCase() : "");
+      };
+      const wantedCode = regionCode(want);
+      return !!wantedCode && [optionValue, optionText].some((candidate) => regionCode(candidate) === wantedCode);
+    }
     if (!isBirthdayPartSemantic(semantic) || !/^\d+$/.test(want)) return false;
     const wantedNumber = Number(want);
     if (

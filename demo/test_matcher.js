@@ -21,6 +21,13 @@ assert(M.classifyFromText("worker threads") !== "threads", "worker threads are n
 assert(M.classifyFromText("number of threads") !== "threads", "thread-count fields are not a social handle");
 assert(M.classifyFromText("first_name") === "firstName", "fname");
 assert(M.classifyFromText("ZIP code") === "zip", "zip");
+assert(M.classifyFromText("state_us_4006867878369-MultipleChoiceField") === "state", "state ID with underscore separator");
+assert(M.classifyFromText("billing_state") === "state", "state suffix with underscore separator");
+assert(M.classifyFromText("province_ca") === "state", "province ID with underscore separator");
+assert(M.classifyFromText("State:") === "state", "state label with trailing punctuation");
+assert(M.classifyFromText("State/Province") === "state", "state/province slash label");
+assert(M.classifyFromText("Region (required)") === "state", "region label with punctuation");
+assert(M.classifyFromText("interstate") !== "state", "embedded state text is not a state field");
 
 const zipAsTel = {
   tag: "input",
@@ -65,7 +72,26 @@ assert(M.selectOptionMatches({ semantic: "birthdayMonth", value: "05" }, { value
 assert(M.selectOptionMatches({ semantic: "birthdayMonth", value: "05" }, { value: "May", text: "May" }), "derived month matches month-name option");
 assert(M.selectOptionMatches({ semantic: "birthdayDay", value: "05" }, { value: "5", text: "5" }), "derived padded day matches unpadded option");
 assert(!M.selectOptionMatches({ semantic: null, value: "05" }, { value: "5", text: "5" }), "ordinary selects retain exact matching");
-
+assert(
+  M.selectOptionMatches({ semantic: "state", value: "Washington" }, { value: "WA", text: "WA" }),
+  "full state name matches postal abbreviation option"
+);
+assert(
+  M.selectOptionMatches({ semantic: "state", value: "WA" }, { value: "Washington", text: "Washington" }),
+  "postal abbreviation matches full state name option"
+);
+assert(
+  M.selectOptionMatches({ semantic: "state", value: "United States Virgin Islands" }, { value: "VI", text: "VI" }),
+  "official Virgin Islands name matches territory code"
+);
+assert(
+  M.selectOptionMatches({ semantic: "state", value: "United States Minor Outlying Islands" }, { value: "UM", text: "UM" }),
+  "official Minor Outlying Islands name matches territory code"
+);
+assert(
+  !M.selectOptionMatches({ semantic: "country", value: "Washington" }, { value: "WA", text: "WA" }),
+  "state normalization does not loosen unrelated selects"
+);
 const welchsDobMonth = {
   ...dobMonth,
   name: "dob_m",
@@ -201,6 +227,22 @@ assert(
 );
 
 const settings = { skipPasswords: true, skipPaymentAndSsn: true };
+const caymanState = {
+  tag: "select",
+  type: "select-one",
+  name: "",
+  id: "state_us_4006867878369-MultipleChoiceField",
+  placeholder: "",
+  autocomplete: "",
+  label: "",
+  ariaLabel: "",
+  disabled: false,
+  readOnly: false
+};
+const caymanStateValue = M.resolveValue(caymanState, { state: "Washington" }, [], settings);
+assert(caymanStateValue.semantic === "state" && caymanStateValue.source === "identity", "Cayman state select resolves from identity");
+assert(M.selectOptionMatches(caymanStateValue, { value: "WA", text: "WA" }), "Cayman WA option matches Washington identity");
+
 const emailInfo = {
   tag: "input",
   type: "email",

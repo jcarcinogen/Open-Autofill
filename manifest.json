@@ -2,7 +2,7 @@
   "manifest_version": 3,
   "name": "Open Autofill",
   "short_name": "Open Autofill",
-  "version": "1.5.7",
+  "version": "1.5.8",
   "description": "Free local form memory. Fills the fields you use again. No cloud. No daily limit.",
   "icons": {
     "16": "icons/icon16.png",

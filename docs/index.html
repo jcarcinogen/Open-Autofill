@@ -1,0 +1,108 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Open Autofill</title>
+    <meta
+      name="description"
+      content="Free local form memory for Chrome. Fills the fields you use again. No cloud. No daily limit."
+    />
+    <style>
+      :root {
+        color-scheme: light dark;
+        --fg: #1b1b1b;
+        --muted: #5c5c5c;
+        --bg: #f7f7f5;
+        --card: #ffffff;
+        --accent: #2f7d4a;
+        --border: #e4e4e0;
+      }
+      @media (prefers-color-scheme: dark) {
+        :root {
+          --fg: #f3f3f0;
+          --muted: #b0b0a8;
+          --bg: #121412;
+          --card: #1a1d1a;
+          --accent: #6dce8a;
+          --border: #2a2e2a;
+        }
+      }
+      * { box-sizing: border-box; }
+      body {
+        margin: 0;
+        font: 16px/1.55 system-ui, -apple-system, Segoe UI, sans-serif;
+        color: var(--fg);
+        background: var(--bg);
+      }
+      main {
+        max-width: 42rem;
+        margin: 0 auto;
+        padding: 3rem 1.25rem 4rem;
+      }
+      .card {
+        background: var(--card);
+        border: 1px solid var(--border);
+        border-radius: 16px;
+        padding: 1.5rem;
+      }
+      h1 {
+        margin: 0 0 0.4rem;
+        font-size: 1.85rem;
+        letter-spacing: -0.02em;
+      }
+      p { margin: 0.75rem 0; color: var(--muted); }
+      .lead { color: var(--fg); font-size: 1.05rem; }
+      ul {
+        margin: 0.75rem 0 0;
+        padding-left: 1.15rem;
+        color: var(--muted);
+      }
+      a {
+        color: var(--accent);
+        text-decoration: none;
+      }
+      a:hover { text-decoration: underline; }
+      .links {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 0.85rem 1.25rem;
+        margin-top: 1.35rem;
+      }
+      .pill {
+        display: inline-block;
+        margin-top: 1rem;
+        padding: 0.2rem 0.55rem;
+        border-radius: 999px;
+        border: 1px solid var(--border);
+        color: var(--muted);
+        font-size: 0.85rem;
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <div class="card">
+        <h1>Open Autofill</h1>
+        <p class="lead">
+          Free local form memory for Chrome. Fills the fields you use again. No cloud. No daily limit.
+        </p>
+        <p>
+          Your answers stay in this browser profile. Open Autofill does not create accounts, sync to a server,
+          or sell data.
+        </p>
+        <ul>
+          <li>Reusable identity fields (email, name, address, phone, social handles)</li>
+          <li>Per-site extras Chrome’s built-in autofill often misses</li>
+          <li>Always free. Local only.</li>
+        </ul>
+        <div class="links">
+          <a href="https://github.com/jcarcinogen/Open-Autofill">Source on GitHub</a>
+          <a href="privacy.html">Privacy policy</a>
+          <a href="mailto:scottdangel+openautofill@gmail.com">Support</a>
+        </div>
+        <div class="pill">Publisher: Scott Angel</div>
+      </div>
+    </main>
+  </body>
+</html>

@@ -1,6 +1,8 @@
 # Open Autofill — Privacy Policy
 
-Last updated: August 21, 2026
+Last updated: August 26, 2026
+
+Public HTTPS copy: https://jcarcinogen.github.io/Open-Autofill/privacy.html
 
 Open Autofill is a free browser extension. It is designed so your form answers **never leave your device**.
 

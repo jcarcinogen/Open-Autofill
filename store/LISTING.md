@@ -45,7 +45,8 @@ Productivity / Tools
 - Sold: no
 - Used for ads: no
 - Transferred: no (except the user exporting their own JSON file)
-- Privacy policy URL: https://github.com/jcarcinogen/Open-Autofill/blob/main/store/PRIVACY.md
+- Privacy policy URL: https://jcarcinogen.github.io/Open-Autofill/privacy.html
+- Official website URL: https://jcarcinogen.github.io/Open-Autofill/
 
 ## Assets still needed before submit
 

@@ -24,15 +24,18 @@ chrome.runtime.onInstalled.addListener(async () => {
       skipPasswords: true,
       skipPaymentAndSsn: true,
       fillDelayMs: 150,
-      excludedHosts: []
+      excludedHosts: [],
+      consented: false
     };
   }
   if (!existing.identity) {
     patch.identity = {
       email: "",
       firstName: "",
+      middleName: "",
       lastName: "",
       fullName: "",
+      nickname: "",
       phone: "",
       address1: "",
       address2: "",
@@ -80,7 +83,7 @@ async function sendToActiveTab(type) {
 
 function isInjectable(url) {
   if (!url) return false;
-  return url.startsWith("http://") || url.startsWith("https://") || url.startsWith("file://");
+  return url.startsWith("http://") || url.startsWith("https://");
 }
 
 async function excludeActiveHost() {

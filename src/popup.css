@@ -71,6 +71,16 @@ h2 {
 .muted { color: var(--muted); margin: 0; }
 .small { font-size: 12px; line-height: 1.45; text-wrap: pretty; }
 
+.consent {
+  margin: 0 0 12px;
+  padding: 12px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--card);
+}
+
+.consent .primary { width: 100%; margin-top: 10px; }
+
 .switch {
   display: flex;
   align-items: center;

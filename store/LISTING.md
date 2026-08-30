@@ -1,4 +1,4 @@
-# Chrome Web Store listing (draft — do not submit yet)
+# Chrome Web Store listing
 
 Short description (max 132 characters):
 
@@ -15,13 +15,13 @@ Always free. No “10 fills per day.” No account. No cloud.
 Your answers stay in this Chrome profile. Export a JSON backup if you want a file on disk; nothing is uploaded.
 
 What it fills
-• Email, name, address, phone, Instagram, and other fields you use often
+• Email, full/preferred names, address, phone, social handles, and other fields you use often
 • Odd extra questions that only appear on some sites
 • “I agree to the Official Rules” / terms checkboxes (not marketing / newsletter boxes)
 • Dropdowns and the fields you actually used last time
 
 What it will not do
-• Will not fill passwords, card numbers, CVV, or SSN
+• Will not fill passwords, card numbers, CVV, SSN, or one-time codes
 • Will not tick “email me offers” unless you ticked that box on that site
 • Will not run JavaScript macros or solve CAPTCHAs
 • Will not sync across phones unless you copy the JSON yourself
@@ -48,10 +48,10 @@ Productivity / Tools
 - Privacy policy URL: https://jcarcinogen.github.io/Open-Autofill/privacy.html
 - Official website URL: https://jcarcinogen.github.io/Open-Autofill/
 
-## Assets still needed before submit
+## Release assets
 
-- 1280×800 or 640×400 screenshots of the popup and a filled form (no personal email in the shot)
-- Optional 1400×560 promo tile using the green pencil icon
-- Public HTTPS privacy policy URL
+- Screenshots: `store/screenshots/*-1280x800.png` (fake identity only)
+- Small promo tile: `store/screenshots/promo-440x280.png`
+- Store icon: `icons/icon128.png`
+- Package contents: `manifest.json`, `src/`, and `icons/` only
 - Support email: scottdangel+openautofill@gmail.com
-- Do **not** zip/package until testing is done

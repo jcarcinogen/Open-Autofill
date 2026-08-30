@@ -3,8 +3,10 @@
   const IDENTITY_FIELDS = [
     { key: "email", label: "Email", placeholder: "you@example.com" },
     { key: "firstName", label: "First name", placeholder: "Alex" },
+    { key: "middleName", label: "Middle name", placeholder: "Quinn" },
     { key: "lastName", label: "Last name", placeholder: "Rivera" },
     { key: "fullName", label: "Full name", placeholder: "Alex Rivera" },
+    { key: "nickname", label: "Preferred name", placeholder: "Alex" },
     { key: "phone", label: "Phone", placeholder: "4255550100" },
     { key: "address1", label: "Address line 1", placeholder: "123 Main St" },
     { key: "address2", label: "Address line 2", placeholder: "Apt 1" },
@@ -40,7 +42,8 @@
     skipPaymentAndSsn: true,
     fillDelayMs: 150,
     fillSearchFields: false,
-    excludedHosts: []
+    excludedHosts: [],
+    consented: false
   };
 
   const DEFAULT_SKIP_HOSTS = [
@@ -59,14 +62,93 @@
   const emptyIdentity = () =>
     Object.fromEntries(IDENTITY_FIELDS.map((f) => [f.key, ""]));
 
+  function isRecord(value) {
+    return !!value && typeof value === "object" && !Array.isArray(value);
+  }
+
+  function primitiveString(value, max) {
+    if (typeof value === "string" || typeof value === "number" || typeof value === "boolean") {
+      return String(value).slice(0, max);
+    }
+    return "";
+  }
+
+  function normalizeSiteField(field) {
+    if (!isRecord(field)) return null;
+    const key = primitiveString(field.key, 300);
+    if (!key) return null;
+    return {
+      key,
+      aliases: Array.isArray(field.aliases)
+        ? field.aliases.map((alias) => primitiveString(alias, 300)).filter(Boolean)
+        : [],
+      type: primitiveString(field.type, 40),
+      value: typeof field.value === "boolean" ? field.value : primitiveString(field.value, 2000),
+      semantic: primitiveString(field.semantic, 40),
+      role: primitiveString(field.role, 40),
+      label: primitiveString(field.label, 300),
+      override: field.override === true
+    };
+  }
+
+  function normalizeBackupState(value) {
+    const raw = isRecord(value) ? value : {};
+    const rawSettings = isRecord(raw.settings) ? raw.settings : {};
+    const settings = { ...DEFAULT_SETTINGS };
+    for (const key of Object.keys(DEFAULT_SETTINGS)) {
+      if (key === "excludedHosts" || key === "fillDelayMs") continue;
+      if (typeof rawSettings[key] === "boolean") settings[key] = rawSettings[key];
+    }
+    const delay = Number(rawSettings.fillDelayMs);
+    if (Number.isFinite(delay) && delay >= 0) settings.fillDelayMs = delay;
+    settings.excludedHosts = Array.isArray(rawSettings.excludedHosts)
+      ? rawSettings.excludedHosts.map((host) => String(host || "").trim()).filter(Boolean)
+      : [];
+    if (typeof rawSettings.fillOnAppSites === "boolean") settings.fillOnAppSites = rawSettings.fillOnAppSites;
+    settings.skipPasswords = true;
+    settings.skipPaymentAndSsn = true;
+    if (typeof rawSettings.consented === "boolean") settings.consented = rawSettings.consented;
+    else if (Object.keys(rawSettings).length) settings.consented = true;
+
+    const rawIdentity = isRecord(raw.identity) ? raw.identity : {};
+    const identity = emptyIdentity();
+    for (const field of IDENTITY_FIELDS) {
+      const fieldValue = rawIdentity[field.key];
+      if (field.type === "toggle") identity[field.key] = fieldValue === true || fieldValue === "true" ? "true" : "";
+      else identity[field.key] = primitiveString(fieldValue, 500).trim();
+    }
+
+    const siteEntries = [];
+    if (isRecord(raw.sites)) {
+      for (const [host, site] of Object.entries(raw.sites)) {
+        if (!host || !isRecord(site)) continue;
+        const fields = Array.isArray(site.fields) ? site.fields.map(normalizeSiteField).filter(Boolean) : [];
+        siteEntries.push([
+          primitiveString(host, 253),
+          { fields, lastSaved: primitiveString(site.lastSaved, 40) }
+        ]);
+      }
+    }
+    const sites = Object.fromEntries(siteEntries);
+    const rawCleared = isRecord(raw.cleared) ? raw.cleared : {};
+    const cleared = {};
+    for (const key of Object.keys(identity)) {
+      if (rawCleared[key] === true) cleared[key] = true;
+    }
+    return { settings, identity, sites, cleared };
+  }
+
+  function parseBackup(value) {
+    if (!isRecord(value)) throw new Error("Not an Open Autofill backup");
+    if (!isRecord(value.settings) && !isRecord(value.identity) && !isRecord(value.sites)) {
+      throw new Error("Not an Open Autofill backup");
+    }
+    return normalizeBackupState(value);
+  }
+
   async function loadState() {
     const raw = await chrome.storage.local.get(["settings", "identity", "sites", "cleared"]);
-    return {
-      settings: { ...DEFAULT_SETTINGS, ...(raw.settings || {}) },
-      identity: { ...emptyIdentity(), ...(raw.identity || {}) },
-      sites: raw.sites && typeof raw.sites === "object" ? raw.sites : {},
-      cleared: raw.cleared && typeof raw.cleared === "object" ? raw.cleared : {}
-    };
+    return normalizeBackupState(raw);
   }
 
   function stripSemanticFromSites(sites, semantic) {
@@ -145,6 +227,8 @@
     DEFAULT_SETTINGS,
     DEFAULT_SKIP_HOSTS,
     emptyIdentity,
+    normalizeBackupState,
+    parseBackup,
     loadState,
     saveState,
     createSerialTaskQueue,

@@ -248,7 +248,6 @@
   function fire(el) {
     el.dispatchEvent(new Event("input", { bubbles: true, composed: true }));
     el.dispatchEvent(new Event("change", { bubbles: true, composed: true }));
-    el.dispatchEvent(new InputEvent("input", { bubbles: true, data: el.value, inputType: "insertText" }));
   }
 
   function applyValue(el, resolved, highlight, force) {
@@ -304,8 +303,13 @@
       const match = options.find((o) => FMMatcher.selectOptionMatches(resolved, o));
       if (!match) return false;
       if (el.value === match.value) return false;
-      if (!setNativeValue(el, match.value)) return false;
-      fire(el);
+      filling = true;
+      try {
+        if (!setNativeValue(el, match.value)) return false;
+        fire(el);
+      } finally {
+        filling = false;
+      }
       if (highlight) el.classList.add(HIGHLIGHT);
       return true;
     }
@@ -315,8 +319,13 @@
       // Don't clobber a value the page or user already put there.
       return false;
     }
-    if (!setNativeValue(el, resolved.value)) return false;
-    fire(el);
+    filling = true;
+    try {
+      if (!setNativeValue(el, resolved.value)) return false;
+      fire(el);
+    } finally {
+      filling = false;
+    }
     el.dataset.fmFilled = "1";
     if (highlight) el.classList.add(HIGHLIGHT);
     return true;
@@ -339,6 +348,7 @@
     const state = await FM.loadState();
     const host = FM.hostFromUrl(location.href);
     if (!host) return { filled: 0, host: "" };
+    if (!state.settings.consented) return { filled: 0, host, disabled: true };
     if (FM.isExcluded(state.settings, host)) return { filled: 0, host, excluded: true };
     if (!force && !state.settings.autoFill) return { filled: 0, host, disabled: true };
 
@@ -348,6 +358,9 @@
     for (const el of collectFields()) {
       const info = inspect(el);
       const resolved = FMMatcher.resolveValue(info, state.identity, site.fields, state.settings, state.cleared);
+      if (!force && resolved.kind === "checkbox" && (resolved.semantic === "agreeToRules" || resolved.role === "agreement")) {
+        continue;
+      }
       if (force && String(el.value || "").trim() && resolved.value) {
         delete el.dataset.fmUserEdited;
       }
@@ -357,10 +370,12 @@
     return { filled, host };
   }
 
-  async function rememberPage() {
+  async function rememberPage(options) {
     const state = await FM.loadState();
     const host = FM.hostFromUrl(location.href);
     if (!host) return { saved: 0, host: "" };
+    if (!state.settings.consented) return { saved: 0, host, disabled: true };
+    if (options && options.automatic && !state.settings.autoLearn) return { saved: 0, host, disabled: true };
     if (FM.isExcluded(state.settings, host)) return { saved: 0, host, excluded: true };
 
     let identity = { ...state.identity };
@@ -415,7 +430,7 @@
 
   async function rememberField(el) {
     const state = await FM.loadState();
-    if (!state.settings.autoLearn) return;
+    if (!state.settings.autoLearn || !state.settings.consented) return;
     const host = FM.hostFromUrl(location.href);
     if (!host || FM.isExcluded(state.settings, host)) return;
     const info = inspect(el);
@@ -458,7 +473,7 @@
     document.addEventListener(
       "submit",
       () => {
-        enqueueLearn(() => rememberPage()).catch(() => {});
+        enqueueLearn(() => rememberPage({ automatic: true })).catch(() => {});
       },
       true
     );

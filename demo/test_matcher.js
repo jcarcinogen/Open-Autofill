@@ -14,12 +14,18 @@ const assert = (cond, msg) => {
 
 assert(M.classifyAutocomplete("email") === "email", "ac email");
 assert(M.classifyAutocomplete("given-name") === "firstName", "ac first");
+assert(M.classifyAutocomplete("additional-name") === "middleName", "ac middle name");
+assert(M.classifyAutocomplete("nickname") === "nickname", "ac nickname");
+assert(M.classifyAutocomplete("email webauthn") === "email", "ac email webauthn");
+assert(M.classifyAutocomplete("given-name webauthn") === "firstName", "ac first webauthn");
 assert(M.classifyFromText("instagram_handle") === "instagram", "ig");
 assert(M.classifyFromText("Threads username") === "threads", "threads handle");
 assert(M.classifyFromText("Bluesky / Bsky handle") === "bluesky", "bluesky handle");
 assert(M.classifyFromText("worker threads") !== "threads", "worker threads are not a social handle");
 assert(M.classifyFromText("number of threads") !== "threads", "thread-count fields are not a social handle");
 assert(M.classifyFromText("first_name") === "firstName", "fname");
+assert(M.classifyFromText("Middle name") === "middleName", "middle name");
+assert(M.classifyFromText("Preferred name") === "nickname", "preferred name");
 assert(M.classifyFromText("ZIP code") === "zip", "zip");
 assert(M.classifyFromText("state_us_4006867878369-MultipleChoiceField") === "state", "state ID with underscore separator");
 assert(M.classifyFromText("billing_state") === "state", "state suffix with underscore separator");
@@ -340,6 +346,66 @@ assert(learned.siteFields[0].value === "vanilla", "learn site");
 const again = M.resolveValue(flavor, {}, learned.siteFields, settings);
 assert(again.value === "vanilla" && again.source === "site", "resolve site");
 
+const shippingPreference = {
+  ...flavor,
+  name: "shipping_preference",
+  id: "shipping-preference",
+  label: "Preference"
+};
+const billingPreference = {
+  ...flavor,
+  name: "billing_preference",
+  id: "billing-preference",
+  label: "Preference"
+};
+const learnedShippingPreference = M.learnFromField(shippingPreference, "Leave at door", {}, [], settings);
+const learnedBothPreferences = M.learnFromField(
+  billingPreference,
+  "Email receipt",
+  {},
+  learnedShippingPreference.siteFields,
+  settings
+);
+assert(learnedBothPreferences.siteFields.length === 2, "same-label fields with stable names remain independent");
+assert(
+  M.resolveValue(shippingPreference, {}, learnedBothPreferences.siteFields, settings).value === "Leave at door",
+  "first same-label field restores its own value"
+);
+assert(
+  M.resolveValue(billingPreference, {}, learnedBothPreferences.siteFields, settings).value === "Email receipt",
+  "second same-label field restores its own value"
+);
+
+const sharedNameA = { ...flavor, name: "preference", id: "shipping-preference", label: "Preference" };
+const sharedNameB = { ...flavor, name: "preference", id: "billing-preference", label: "Preference" };
+const learnedSharedName = M.learnFromField(sharedNameB, "Email receipt", {}, M.learnFromField(sharedNameA, "Leave at door", {}, [], settings).siteFields, settings);
+assert(learnedSharedName.siteFields.length === 2, "same name with different stable ids stay independent");
+assert(M.resolveValue(sharedNameA, {}, learnedSharedName.siteFields, settings).value === "Leave at door", "stable id keeps first same-name field");
+assert(M.resolveValue(sharedNameB, {}, learnedSharedName.siteFields, settings).value === "Email receipt", "stable id keeps second same-name field");
+
+const renamed = { ...flavor, name: "new_code", id: "stable-id", label: "Preference" };
+const learnedOldName = M.learnFromField({ ...renamed, name: "old_code" }, "kept", {}, [], settings);
+assert(M.resolveValue(renamed, {}, learnedOldName.siteFields, settings).value === "kept", "renamed field still matches its stable id");
+
+const ssn = {
+  tag: "input",
+  type: "text",
+  name: "ssn",
+  id: "ssn",
+  placeholder: "",
+  autocomplete: "",
+  label: "Social Security Number",
+  ariaLabel: "",
+  disabled: false,
+  readOnly: false
+};
+assert(M.classify(ssn, settings).skip, "spaced SSN label is skipped");
+assert(!M.learnFromField(ssn, "123-45-6789", {}, [], settings).learned, "SSN is never learned");
+const card = { ...ssn, name: "cc", id: "cc", label: "Credit Card Number", autocomplete: "" };
+assert(M.classify(card, { ...settings, skipPaymentAndSsn: false }).skip, "card numbers stay skipped even if the safety toggle is off");
+const otp = { ...ssn, name: "code", id: "code", label: "Code", autocomplete: "one-time-code" };
+assert(M.classify(otp, settings).skip, "one-time codes are skipped");
+
 const pw = {
   tag: "input",
   type: "password",
@@ -614,6 +680,8 @@ vm.runInContext(sharedSrc, ctx);
 const FM = ctx.FM;
 assert(FM.IDENTITY_FIELDS.some((field) => field.key === "threads"), "identity profile includes Threads");
 assert(FM.IDENTITY_FIELDS.some((field) => field.key === "bluesky"), "identity profile includes Bluesky");
+assert(FM.IDENTITY_FIELDS.some((field) => field.key === "middleName"), "identity profile includes middle name");
+assert(FM.IDENTITY_FIELDS.some((field) => field.key === "nickname"), "identity profile includes preferred name");
 assert(FM.cleanNodeText(null) === "", "missing DOM context cleans to an empty string");
 assert(
   FM.cleanNodeText({ textContent: "  Date   of Birth  " }) === "Date of Birth",

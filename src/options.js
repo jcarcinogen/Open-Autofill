@@ -123,12 +123,9 @@ document.getElementById("import").addEventListener("change", async (e) => {
   try {
     const text = await file.text();
     const data = JSON.parse(text);
-    await FM.saveState({
-      settings: { ...FM.DEFAULT_SETTINGS, ...(data.settings || {}) },
-      identity: { ...FM.emptyIdentity(), ...(data.identity || {}) },
-      sites: data.sites || {}
-    });
-    const sites = Object.keys(data.sites || {}).length;
+    const imported = FM.parseBackup(data);
+    await FM.saveState(imported);
+    const sites = Object.keys(imported.sites).length;
     setBackupStatus(`Imported “${file.name}” from disk. ${sites} site(s). Nothing was uploaded.`);
     render();
   } catch (err) {

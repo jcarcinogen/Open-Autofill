@@ -1,6 +1,6 @@
 # Open Autofill
 
-[![ko-fi](https://ko-fi.com/img/githubbutton_sm.svg)](https://ko-fi.com/T2J625IUHY)
+[![ko-fi](https://ko-fi.com/img/githubbutton_sm.svg)](https://ko-fi.com/scottangel)
 
 A Chrome extension that remembers what you type in forms and fills it again the next time. Local only. **No daily cap. Always free.**
 
@@ -52,14 +52,18 @@ Visit [http://127.0.0.1:8765/form.html](http://127.0.0.1:8765/form.html) **in Ch
 
 Open Autofill is free and always will be. Tips are optional:
 
-[![ko-fi](https://ko-fi.com/img/githubbutton_sm.svg)](https://ko-fi.com/T2J625IUHY)
+[![ko-fi](https://ko-fi.com/img/githubbutton_sm.svg)](https://ko-fi.com/scottangel)
 
 ## Tests
 
 ```bash
-python3 demo/test_matcher.py
+node demo/test_matcher.js src/matcher.js
+node demo/test_learning_queue.js
+node demo/test_shared.js
+node demo/test_manifest.js
 ```
 
-## Chrome Web Store (later)
+## Chrome Web Store
 
-Draft listing and privacy policy live in `store/`. Do not zip or submit until testing is done. The extension will stay free and local-only.
+Release listing copy and the privacy policy live in `store/`. The public website and privacy policy are published from `docs/`.
+Store packages contain only `manifest.json`, `src/`, and `icons/`. The extension stays free and local-only.

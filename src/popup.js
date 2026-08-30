@@ -21,8 +21,14 @@ async function render() {
   const host = tab && tab.url ? FM.hostFromUrl(tab.url) : "";
   hostEl.textContent = host || "This page cannot be filled";
   autoFillEl.checked = !!state.settings.autoFill;
+  const consented = !!state.settings.consented;
+  document.getElementById("consent").hidden = consented;
+  document.getElementById("fill").disabled = !consented;
+  document.getElementById("remember").disabled = !consented;
+  autoFillEl.disabled = !consented;
 
   identityEl.innerHTML = "";
+  if (!consented) return;
   for (const field of FM.IDENTITY_FIELDS) {
     const wrap = document.createElement("div");
     wrap.className = "field";
@@ -43,9 +49,11 @@ async function render() {
       input.value = state.identity[field.key] || "";
       const save = async () => {
         await FM.setIdentityValue(field.key, input.value.trim());
-        if (field.key === "firstName" || field.key === "lastName") {
+        if (field.key === "firstName" || field.key === "middleName" || field.key === "lastName") {
           const current = await FM.loadState();
-          const full = [current.identity.firstName, current.identity.lastName].filter(Boolean).join(" ");
+          const full = [current.identity.firstName, current.identity.middleName, current.identity.lastName]
+            .filter(Boolean)
+            .join(" ");
           if (full && !current.identity.fullName) await FM.setIdentityValue("fullName", full);
         }
       };
@@ -86,6 +94,15 @@ autoFillEl.addEventListener("change", async () => {
   const state = await FM.loadState();
   state.settings.autoFill = autoFillEl.checked;
   await FM.saveState({ settings: state.settings });
+});
+
+document.getElementById("enableMemory").addEventListener("click", async () => {
+  const state = await FM.loadState();
+  state.settings.consented = true;
+  state.settings.autoFill = true;
+  state.settings.autoLearn = true;
+  await FM.saveState({ settings: state.settings });
+  render();
 });
 
 render();

@@ -5,10 +5,10 @@
     "email-address": "email",
     "username email": "email",
     "given-name": "firstName",
-    "additional-name": "firstName",
+    "additional-name": "middleName",
     "family-name": "lastName",
     name: "fullName",
-    nickname: "fullName",
+    nickname: "nickname",
     tel: "phone",
     "tel-national": "phone",
     "tel-local": "phone",
@@ -61,7 +61,9 @@
     { key: "facebook", re: /face[_-]?book/i },
     { key: "youtube", re: /you[_-]?tube/i },
     { key: "firstName", re: /(first[_-\s]?name|given[_-\s]?name|forename|\bfname\b|\bfirstname\b)/i },
+    { key: "middleName", re: /(middle[_-\s]?name|additional[_-\s]?name|\bmname\b|\bmiddlename\b)/i },
     { key: "lastName", re: /(last[_-\s]?name|family[_-\s]?name|surname|\blname\b|\blastname\b)/i },
+    { key: "nickname", re: /(preferred[_-\s]?name|display[_-\s]?name|screen[_-\s]?name|\bnickname\b)/i },
     { key: "phone", re: /(phone|mobile|cell|telephone|\btel\b)/i },
     { key: "address2", re: /(address[_-\s]?line[_-\s]?2|addr(?:ess)?[\s_-]?2|\bapt\.?\b|\bsuite\b|\bunit\b|\bapartment\b)/i },
     { key: "address1", re: /(street[_-\s]?address|address[_-\s]?line[_-\s]?1|addr(?:ess)?[_-]?1|\bstreet\b|\baddress\b)/i },
@@ -74,7 +76,7 @@
     { key: "gender", re: /(\bgender\b|\bsex\b)/i },
     { key: "company", re: /(company|organization|organisation|business[_-\s]?name)/i },
     { key: "website", re: /(website|web[_-\s]?site|\burl\b|homepage)/i },
-    { key: "fullName", re: /(full[_-\s]?name|your[_-\s]?name|display[_-\s]?name|(^|[_-\s])name($|[_-\s]))/i }
+    { key: "fullName", re: /(full[_-\s]?name|your[_-\s]?name|(^|[_-\s])name($|[_-\s]))/i }
   ];
 
   const MARKETING_RE =
@@ -85,7 +87,7 @@
     /(recaptcha|g-recaptcha|hcaptcha|h-captcha|turnstile|captcha|i['’]m not a robot|not a robot|characters seen in the picture|type the characters)/i;
 
   const SENSITIVE_RE =
-    /(password|passwd|passcode|new[_-]?pass|current[_-]?pass|card[_-]?number|cc[_-]?num|credit[_-]?card|cardholder|\bcvc\b|\bcvv\b|\bcid\b|\bcsc\b|\bssn\b|social[_-]?security|routing[_-]?number|account[_-]?number|\biban\b|\bswift\b)/i;
+    /(password|passwd|passcode|pass[_\s-]?phrase|new[_\s-]?pass|current[_\s-]?pass|card[_\s-]?number|cc[_\s-]?num|credit[_\s-]?card|cardholder|\bcvc\b|\bcvv2?\b|\bcid\b|\bcsc\b|\bssn\b|social[_\s-]?security|routing[_\s-]?number|account[_\s-]?number|\biban\b|\bswift\b|one[_\s-]?time[_\s-]?(code|password)|\botp\b|sms[_\s-]?otp|\btotp\b|authenticator)/i;
 
   const SKIP_TYPES = new Set([
     "password",
@@ -151,10 +153,11 @@
     const tokens = String(value || "")
       .toLowerCase()
       .split(/\s+/)
-      .filter((t) => t && t !== "on" && t !== "off" && t !== "section-");
+      .filter((t) => t && t !== "on" && t !== "off" && t !== "webauthn" && !t.startsWith("section-"));
     if (!tokens.length) return null;
-    const last = tokens[tokens.length - 1];
-    if (AUTOCOMPLETE_MAP[last]) return AUTOCOMPLETE_MAP[last];
+    for (let i = tokens.length - 1; i >= 0; i -= 1) {
+      if (AUTOCOMPLETE_MAP[tokens[i]]) return AUTOCOMPLETE_MAP[tokens[i]];
+    }
     if (AUTOCOMPLETE_MAP[tokens.join(" ")]) return AUTOCOMPLETE_MAP[tokens.join(" ")];
     return null;
   }
@@ -287,8 +290,23 @@
 
   function isSensitive(info) {
     if (String(info.type || "").toLowerCase() === "password") return true;
-    const ac = String(info.autocomplete || "").toLowerCase();
-    if (ac.startsWith("cc-") || ac === "current-password" || ac === "new-password") return true;
+    const tokens = String(info.autocomplete || "")
+      .toLowerCase()
+      .split(/\s+/)
+      .filter(Boolean);
+    if (
+      tokens.some(
+        (token) =>
+          token.startsWith("cc-") ||
+          token === "current-password" ||
+          token === "new-password" ||
+          token === "one-time-code" ||
+          token.endsWith("-otp") ||
+          token === "otp"
+      )
+    ) {
+      return true;
+    }
     return SENSITIVE_RE.test(blobFromField(info));
   }
 
@@ -316,8 +334,7 @@
     if (SKIP_TYPES.has(type) && type !== "hidden") return true;
     if (type === "hidden") return true;
     if (CAPTCHA_RE.test(blobFromField(info))) return true;
-    if (settings && settings.skipPasswords && type === "password") return true;
-    if (settings && settings.skipPaymentAndSsn && isSensitive(info)) return true;
+    if (type === "password" || isSensitive(info)) return true;
     if (!(settings && settings.fillSearchFields) && isSearchField(info)) return true;
     if (type === "checkbox" && isUiCheckbox(info)) return true;
     if (info.disabled || info.readOnly) return true;
@@ -420,6 +437,15 @@
       const storedName = storedKeys.find((key) => key.startsWith("radioname:"));
       if (currentName && storedName) return currentName === storedName;
     }
+    const currentName = keys.find((key) => key.startsWith("name:") && !isVolatileToken(key));
+    const storedName = storedKeys.find((key) => key.startsWith("name:") && !isVolatileToken(key));
+    const currentId = keys.find((key) => key.startsWith("id:") && !isVolatileToken(key));
+    const storedId = storedKeys.find((key) => key.startsWith("id:") && !isVolatileToken(key));
+    if (currentId && storedId) {
+      if (currentId === storedId) return true;
+      return false;
+    }
+    if (currentName && storedName) return currentName === storedName;
     return storedKeys.some((key) => keys.includes(key));
   }
 

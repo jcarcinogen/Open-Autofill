@@ -36,7 +36,7 @@
         background: var(--bg);
       }
       main {
-        max-width: 42rem;
+        max-width: 56rem;
         margin: 0 auto;
         padding: 3rem 1.25rem 4rem;
       }
@@ -78,6 +78,33 @@
         color: var(--muted);
         font-size: 0.85rem;
       }
+      .gallery {
+        margin-top: 1.5rem;
+        display: grid;
+        gap: 1.15rem;
+      }
+      .gallery h2 {
+        margin: 0;
+        font-size: 1.05rem;
+        letter-spacing: -0.01em;
+      }
+      figure {
+        margin: 0;
+        background: var(--card);
+        border: 1px solid var(--border);
+        border-radius: 16px;
+        overflow: hidden;
+      }
+      figure img {
+        display: block;
+        width: 100%;
+        height: auto;
+      }
+      figcaption {
+        padding: 0.75rem 1rem 1rem;
+        color: var(--muted);
+        font-size: 0.9rem;
+      }
     </style>
   </head>
   <body>
@@ -103,6 +130,45 @@
         </div>
         <div class="pill">Publisher: Scott Angel</div>
       </div>
+      <section class="gallery" aria-label="Product screenshots">
+        <h2>Screenshots</h2>
+        <figure>
+          <img
+            src="screenshots/01-popup-1280x800.png"
+            alt="Open Autofill popup with demo identity for Alex Rivera on example.com"
+            width="1280"
+            height="800"
+          />
+          <figcaption>Toolbar popup. Demo data only — Alex Rivera, you@example.com.</figcaption>
+        </figure>
+        <figure>
+          <img
+            src="screenshots/01-filled-form-1280x800.png"
+            alt="Practice form filled by Open Autofill with green outlines and demo values"
+            width="1280"
+            height="800"
+          />
+          <figcaption>A practice form filled from local memory. Site-specific extras stay on that site.</figcaption>
+        </figure>
+        <figure>
+          <img
+            src="screenshots/02-options-settings-1280x800.png"
+            alt="Open Autofill settings with password and payment fields locked off"
+            width="1280"
+            height="800"
+          />
+          <figcaption>Settings stay local. Passwords, cards, SSN, and one-time codes are never filled.</figcaption>
+        </figure>
+        <figure>
+          <img
+            src="screenshots/03-backup-support-1280x800.png"
+            alt="Backup export and import on the Open Autofill options page"
+            width="1280"
+            height="800"
+          />
+          <figcaption>JSON backup stays on your computer. Nothing is uploaded.</figcaption>
+        </figure>
+      </section>
     </main>
   </body>
 </html>

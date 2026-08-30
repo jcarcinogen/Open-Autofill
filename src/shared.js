@@ -87,6 +87,8 @@
       semantic: primitiveString(field.semantic, 40),
       role: primitiveString(field.role, 40),
       label: primitiveString(field.label, 300),
+      optionLabel: primitiveString(field.optionLabel, 300),
+      optionValue: primitiveString(field.optionValue, 300),
       override: field.override === true
     };
   }

@@ -75,6 +75,23 @@ const assert = (condition, message) => {
   assert(poisoned.sites["example.com"].fields[0].semantic === "", "object semantic is discarded");
   assert(poisoned.sites["example.com"].fields[0].value === "", "object value is discarded");
 
+  const radioKept = ctx.FM.normalizeBackupState({
+    sites: {
+      "example.com": {
+        fields: [
+          {
+            key: "radioname:color",
+            value: "Blue",
+            optionLabel: "Blue",
+            optionValue: "b"
+          }
+        ]
+      }
+    }
+  });
+  assert(radioKept.sites["example.com"].fields[0].optionLabel === "Blue", "radio option labels survive load");
+  assert(radioKept.sites["example.com"].fields[0].optionValue === "b", "radio option values survive load");
+
   const upgraded = ctx.FM.normalizeBackupState({
     settings: { autoFill: true },
     identity: { email: "alex@example.com" }

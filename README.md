@@ -11,13 +11,21 @@ This is original software for your own browser profile. It is not Lightning Auto
 - Keeps a reusable **identity** (email, name, address, phone, Instagram, etc.)
 - Also remembers **odd extra fields per website** that Chrome’s built-in autofill misses
 - Learns as you type, blur, or submit
-- Remembers **Official Rules / I agree** checkboxes (not marketing opt-ins)
+- Remembers and fills **required rules / terms / eligibility** checkboxes without treating marketing opt-ins as agreements
 - Auto-fills when a page loads, including fields that appear late
 - Leaves **search boxes** alone by default (Google, Bing, Gmail, Outlook). Turn that on in settings if you want it.
 - Keyboard: `Alt+Shift+F` fill, `Alt+Shift+S` remember
 - Right-click: fill, remember, or ignore this site
 - Skips passwords, card numbers, CVV, and SSN
 - Export / import a JSON backup from the options page
+
+## Screenshots
+
+![Practice form filled from local memory](docs/screenshots/01-filled-form-1280x800.png)
+
+![Required rules and eligibility checkboxes filled while an unselected optional marketing checkbox stays empty](docs/screenshots/04-required-checkboxes-1280x800.png)
+
+More examples are on the [Open Autofill GitHub Pages site](https://jcarcinogen.github.io/Open-Autofill/).
 
 ## Install in Chrome
 

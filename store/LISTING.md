@@ -17,8 +17,8 @@ Your answers stay in this Chrome profile. Export a JSON backup if you want a fil
 What it fills
 • Email, full/preferred names, address, phone, social handles, and other fields you use often
 • Odd extra questions that only appear on some sites
-• “I agree to the Official Rules” / terms checkboxes (not marketing / newsletter boxes)
-• Dropdowns and the fields you actually used last time
+• Required Official Rules, terms, and eligibility checkboxes; marketing / newsletter choices remain site-specific
+• Dropdowns across common equivalent formats, such as US / United States, M / Male, and state names / codes
 
 What it will not do
 • Will not fill passwords, card numbers, CVV, SSN, or one-time codes

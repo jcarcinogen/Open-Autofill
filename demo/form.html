@@ -8,6 +8,9 @@
       body { max-width: 560px; margin: 40px auto; }
       label { display: block; margin: 12px 0 4px; color: #b4a99b; }
       input, select { width: 100%; padding: 8px; border-radius: 8px; border: 1px solid #3a342c; background: #201e1b; color: inherit; }
+      .choice { display: flex; gap: 8px; align-items: flex-start; color: #f3ece3; }
+      .choice input { width: auto; margin-top: 4px; }
+      .optional { color: #8f867b; }
       .row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
       button { margin-top: 18px; padding: 10px 14px; border: 0; border-radius: 8px; background: #e0a14a; color: #1b140c; font-weight: 700; }
     </style>
@@ -53,7 +56,12 @@
       <label for="favorite">Favorite flavor (site-specific)</label>
       <input id="favorite" name="favorite_flavor" />
 
-      <label><input type="checkbox" name="rules" /> I agree to the official rules</label>
+      <label class="choice"><input type="checkbox" name="rules" required /> <span>I agree to the official rules</span></label>
+      <div class="choice">
+        <input id="eligibility" type="checkbox" name="eligibility" required aria-describedby="eligibility-copy" />
+        <span id="eligibility-copy">I confirm I am a legal resident and have reached the age of majority.</span>
+      </div>
+      <label class="choice optional"><input type="checkbox" name="newsletter" /> Send me optional news and offers</label>
       <button type="submit">Submit</button>
     </form>
     <script>

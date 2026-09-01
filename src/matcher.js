@@ -48,6 +48,32 @@
     ontario: "ON", "prince edward island": "PE", quebec: "QC", saskatchewan: "SK", yukon: "YT"
   };
 
+  const COUNTRY_CODES = {
+    "united states": "US",
+    "united states of america": "US",
+    usa: "US",
+    us: "US",
+    canada: "CA",
+    ca: "CA",
+    "united kingdom": "GB",
+    "great britain": "GB",
+    uk: "GB",
+    gb: "GB"
+  };
+
+  const GENDER_VALUES = {
+    male: "male",
+    man: "male",
+    m: "male",
+    female: "female",
+    woman: "female",
+    f: "female",
+    nonbinary: "nonbinary",
+    "non-binary": "nonbinary",
+    "non binary": "nonbinary",
+    nb: "nonbinary"
+  };
+
   const SEMANTIC_PATTERNS = [
     { key: "email", re: /(e[-\s]?mail|mailaddress|emailaddress)/i },
     { key: "instagram", re: /(instagram|\binsta\b|\big[_-]?handle\b|\big\b)/i },
@@ -80,9 +106,9 @@
   ];
 
   const MARKETING_RE =
-    /(newsletter|marketing|promotions?|offers?|sign\s*up to receive|wish to receive|receive .{0,40}updates|email me|send me|third[-\s]?part|partners?|sms alerts?|text alerts?|unsubscribe|\bopt[_-]?in\b)/i;
+    /(newsletter|marketing|promotions?|offers?|sign\s*up to receive|wish to receive|receive .{0,40}updates|keep me (updated|informed|posted)|email me|send me|third[-\s]?part|partners?|sms alerts?|text alerts?|unsubscribe|\bopt[_-]?in\b)/i;
   const AGREEMENT_RE =
-    /(official\s*rules|terms\s*(and|&)\s*conditions|terms\s*of\s*(use|service)|sweepstakes|\bi agree\b|\bi agreed\b|\bi accept\b|i have read|i['’]ve read|agreed to|agree to (the|these)|eligibility|18\s*(years|or older)|over\s*18)/i;
+    /(official\s*rules|terms\s*(and|&)\s*conditions|terms\s*of\s*(use|service)|sweepstakes|\bi agree\b|\bi agreed\b|\bi accept\b|i have read|i['’]ve read|agreed to|agree to (the|these)|eligib(?:ility|le)|legal\s+resident|age\s+of\s+majority|18\s*(years|or older)|over\s*18)/i;
   const CAPTCHA_RE =
     /(recaptcha|g-recaptcha|hcaptcha|h-captcha|turnstile|captcha|i['’]m not a robot|not a robot|characters seen in the picture|type the characters)/i;
 
@@ -107,6 +133,11 @@
       .trim();
   }
 
+  function preferredCheckboxLabel(label, context) {
+    const direct = norm(label);
+    return direct || norm(context);
+  }
+
   function blobFromField(info) {
     return [
       info.autocomplete,
@@ -117,6 +148,7 @@
       info.ariaLabel,
       info.value,
       info.groupLabel,
+      info.context,
       info.type
     ]
       .map(norm)
@@ -133,7 +165,8 @@
       info.label,
       info.ariaLabel,
       info.value,
-      info.groupLabel
+      info.groupLabel,
+      info.context
     ]
       .map(norm)
       .filter(Boolean)
@@ -210,6 +243,16 @@
       const wantedCode = regionCode(want);
       return !!wantedCode && [optionValue, optionText].some((candidate) => regionCode(candidate) === wantedCode);
     }
+    if (semantic === "country") {
+      const countryCode = (value) => COUNTRY_CODES[norm(value).toLowerCase().replace(/\s+/g, " ")] || "";
+      const wantedCode = countryCode(want);
+      return !!wantedCode && [optionValue, optionText].some((candidate) => countryCode(candidate) === wantedCode);
+    }
+    if (semantic === "gender") {
+      const genderValue = (value) => GENDER_VALUES[norm(value).toLowerCase().replace(/\s+/g, " ")] || "";
+      const wantedGender = genderValue(want);
+      return !!wantedGender && [optionValue, optionText].some((candidate) => genderValue(candidate) === wantedGender);
+    }
     if (!isBirthdayPartSemantic(semantic) || !/^\d+$/.test(want)) return false;
     const wantedNumber = Number(want);
     if (
@@ -249,12 +292,27 @@
     return false;
   }
 
+  function checkboxAgreementIsRequired(info) {
+    if (info.required == null) return true;
+    if (info.required) return true;
+    const directLabel = [info.label, info.ariaLabel].map(norm).join(" ").trim();
+    const requiredMarker = (text) => /\brequired\b/i.test(text) || text.includes("*");
+    const context = norm(info.context);
+    if (directLabel.length >= 8) {
+      return requiredMarker(directLabel) || /\brequired\b/i.test(context);
+    }
+    return requiredMarker([directLabel, context].join(" "));
+  }
+
   function checkboxRole(info) {
     if (isUiCheckbox(info)) return "ui";
-    const text = [info.label, info.ariaLabel, info.value, info.name, info.id].map(norm).join(" ");
-    if (!text) return "other";
-    if (MARKETING_RE.test(text)) return "marketing";
-    if (AGREEMENT_RE.test(text)) return "agreement";
+    const directLabel = [info.label, info.ariaLabel].map(norm).join(" ").trim();
+    const ownText = [info.label, info.ariaLabel, info.value, info.name, info.id].map(norm).join(" ");
+    const context = norm(info.context);
+    const directIsMeaningful = directLabel.length >= 8;
+    if (MARKETING_RE.test(ownText) || (!directIsMeaningful && MARKETING_RE.test(context))) return "marketing";
+    const hasAgreement = AGREEMENT_RE.test(ownText) || (!directIsMeaningful && AGREEMENT_RE.test(context));
+    if (hasAgreement && checkboxAgreementIsRequired(info)) return "agreement";
     return "other";
   }
 
@@ -418,8 +476,14 @@
   function identityValue(identity, semantic) {
     if (!semantic || !identity) return "";
     const raw = identity[semantic];
-    if (raw == null) return "";
-    return String(raw).trim();
+    if (raw != null && String(raw).trim()) return String(raw).trim();
+    if (semantic === "fullName") {
+      return [identity.firstName, identity.middleName, identity.lastName]
+        .map((part) => String(part || "").trim())
+        .filter(Boolean)
+        .join(" ");
+    }
+    return "";
   }
 
   function semanticValuesEqual(semantic, left, right) {
@@ -522,6 +586,10 @@
     return { ...meta, value: "", source: null };
   }
 
+  function shouldFillResolvedValue(resolved) {
+    return !!resolved && !resolved.skip && resolved.value !== "" && resolved.value != null;
+  }
+
   function learnFromField(info, value, identity, siteFields, settings, options) {
     const opts = options || {};
     const cleared = { ...(opts.cleared || {}) };
@@ -610,6 +678,7 @@
     classify,
     classifyFromText,
     classifyAutocomplete,
+    preferredCheckboxLabel,
     checkboxRole,
     radioPersistValue,
     radioMatches,
@@ -620,6 +689,7 @@
     siteKey,
     siteKeys,
     resolveValue,
+    shouldFillResolvedValue,
     learnFromField,
     blobFromField,
     isCheckedValue,

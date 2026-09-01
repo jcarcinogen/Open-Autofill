@@ -98,6 +98,14 @@ assert(
   !M.selectOptionMatches({ semantic: "country", value: "Washington" }, { value: "WA", text: "WA" }),
   "state normalization does not loosen unrelated selects"
 );
+assert(
+  M.selectOptionMatches({ semantic: "country", value: "United States" }, { value: "US", text: "United States of America" }),
+  "country name matches a common country-code option on an unseen site"
+);
+assert(
+  M.selectOptionMatches({ semantic: "gender", value: "Male" }, { value: "M", text: "M" }),
+  "gender label matches a common abbreviated option on an unseen site"
+);
 const welchsDobMonth = {
   ...dobMonth,
   name: "dob_m",
@@ -263,6 +271,21 @@ const emailInfo = {
 };
 const resolved = M.resolveValue(emailInfo, { email: "a@b.com" }, [], settings);
 assert(resolved.semantic === "email" && resolved.value === "a@b.com" && resolved.source === "identity", "resolve email");
+const fullNameInfo = {
+  ...emailInfo,
+  type: "text",
+  name: "applicant_name",
+  id: "applicant-name",
+  autocomplete: "name",
+  label: "Full name"
+};
+const derivedFullName = M.resolveValue(
+  fullNameInfo,
+  { fullName: "", firstName: "Alex", middleName: "", lastName: "Rivera" },
+  [],
+  settings
+);
+assert(derivedFullName.value === "Alex Rivera" && derivedFullName.source === "identity", "full name derives from name parts on an unseen site");
 
 const bestBuyEmail = {
   ...emailInfo,
@@ -499,6 +522,97 @@ const cjMarketing = {
 };
 assert(M.checkboxRole(cjMarketing) === "marketing", "cayman marketing");
 assert(!M.resolveValue(cjMarketing, { agreeToRules: "true" }, [], settings).value, "no marketing fill");
+
+const contextOnlyRules = {
+  ...rules,
+  name: "consent",
+  id: "consent-box",
+  label: "",
+  ariaLabel: "",
+  value: "yes",
+  required: true,
+  context: "By clicking Submit, I acknowledge that I have read and agree to the Terms & Conditions and Privacy Policy."
+};
+assert(M.checkboxRole(contextOnlyRules) === "agreement", "agreement text from a nearby checkbox container is detected");
+assert(
+  M.resolveValue(contextOnlyRules, { agreeToRules: "true" }, [], settings).value === "true",
+  "context-only agreement resolves on an unseen site"
+);
+const requiredEligible = {
+  ...contextOnlyRules,
+  label: "I certify that I am eligible to enter.",
+  context: ""
+};
+assert(M.checkboxRole(requiredEligible) === "agreement", "required eligible-to-enter confirmation is treated as consent");
+const contextMarkedEligible = {
+  ...requiredEligible,
+  required: false,
+  context: "Required eligibility confirmation"
+};
+assert(
+  M.checkboxRole(contextMarkedEligible) === "agreement",
+  "explicit required wording in nearby context marks an eligibility confirmation as required"
+);
+const ageOfMajority = {
+  ...contextOnlyRules,
+  context: "I certify that I am a legal resident and have reached the age of majority."
+};
+assert(M.checkboxRole(ageOfMajority) === "agreement", "eligibility confirmation is treated as required consent");
+const shortDirectAcceptance = {
+  ...contextOnlyRules,
+  label: "I accept",
+  required: false,
+  context: "Official Rules* apply to this promotion."
+};
+assert(
+  M.preferredCheckboxLabel(shortDirectAcceptance.label, shortDirectAcceptance.context) === "I accept",
+  "short direct checkbox labels are preserved instead of being replaced by broad context"
+);
+assert(
+  M.preferredCheckboxLabel("", contextOnlyRules.context) === contextOnlyRules.context,
+  "nearby context supplies a label only when the checkbox has no direct label"
+);
+assert(M.checkboxRole(shortDirectAcceptance) === "other", "optional short acceptance is not promoted by broad rules context");
+const optionalTerms = {
+  ...contextOnlyRules,
+  label: "I agree to the Terms & Conditions.",
+  required: false,
+  context: "Official Rules* apply to this promotion."
+};
+assert(M.checkboxRole(optionalTerms) === "other", "optional terms checkbox is not promoted to a global agreement");
+assert(
+  !M.shouldFillResolvedValue(M.resolveValue(optionalTerms, { agreeToRules: "true" }, [], settings)),
+  "global agreement preference does not select optional consent"
+);
+const unrelatedContainerCopy = {
+  ...contextOnlyRules,
+  label: "Keep me updated",
+  required: false,
+  context: "Official Rules apply to this promotion."
+};
+assert(
+  M.checkboxRole(unrelatedContainerCopy) === "marketing",
+  "meaningful marketing label is not overridden by broad rules copy"
+);
+const contextMarketing = {
+  ...contextOnlyRules,
+  context: "Send me news, special offers, and promotions by email."
+};
+assert(M.checkboxRole(contextMarketing) === "marketing", "nearby marketing text is not treated as required consent");
+const learnedContextMarketing = M.learnFromField(contextMarketing, true, {}, [], settings);
+assert(!learnedContextMarketing.identity.agreeToRules, "marketing choice does not become a global agreement");
+assert(
+  M.shouldFillResolvedValue(M.resolveValue(contextMarketing, {}, learnedContextMarketing.siteFields, settings)),
+  "an explicitly selected marketing choice remains site-specific"
+);
+const resolvedContextRules = M.resolveValue(contextOnlyRules, { agreeToRules: "true" }, [], settings);
+assert(M.shouldFillResolvedValue(resolvedContextRules), "remembered required agreements may fill on page load");
+assert(
+  !M.shouldFillResolvedValue(M.resolveValue(contextMarketing, { agreeToRules: "true" }, [], settings)),
+  "marketing opt-ins stay empty on page load"
+);
+const learnedContextRules = M.learnFromField(contextOnlyRules, true, {}, [], settings);
+assert(learnedContextRules.identity.agreeToRules === "true", "context-only required checkbox is remembered");
 
 const radioBase = {
   tag: "input",

@@ -102,5 +102,7 @@ const assert = (condition, message) => {
 
   const parsed = ctx.FM.parseBackup(backup);
   assert(parsed.identity.email === "alex@example.com", "parseBackup accepts a real export");
+  const placeholderCopy = ctx.FM.IDENTITY_FIELDS.map((field) => field.placeholder || "").join(" ");
+  assert(!/Everett|98204/.test(placeholderCopy), "public UI placeholders do not expose the maintainer's location");
   console.log("ok");
 })();

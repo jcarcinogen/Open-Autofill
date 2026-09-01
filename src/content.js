@@ -134,17 +134,42 @@
   }
 
   function nearbyConsentText(el) {
+    const texts = [];
+    const describedBy = el.getAttribute("aria-describedby");
+    if (describedBy && el.ownerDocument) {
+      texts.push(
+        describedBy
+          .split(/\s+/)
+          .map((idRef) => el.ownerDocument.getElementById(idRef))
+          .filter(Boolean)
+          .map((node) => node.innerText || node.textContent || "")
+          .join(" ")
+      );
+    }
+    texts.push(el.getAttribute("aria-description") || "", el.getAttribute("title") || "");
+
     const next = el.nextElementSibling;
-    if (next) {
-      const t = (next.innerText || next.textContent || "").replace(/\s+/g, " ").trim();
-      if (t.length >= 8 && t.length <= 220) return t;
-    }
+    if (next) texts.push(next.innerText || next.textContent || "");
     const prev = el.previousElementSibling;
-    if (prev && !prev.querySelector("input, select, textarea")) {
-      const t = (prev.innerText || prev.textContent || "").replace(/\s+/g, " ").trim();
-      if (t.length >= 8 && t.length <= 220) return t;
+    if (prev && !prev.querySelector("input, select, textarea, [role='checkbox'], [role='radio']")) {
+      texts.push(prev.innerText || prev.textContent || "");
     }
-    return "";
+
+    let node = el.parentElement;
+    for (let i = 0; i < 3 && node && !/^(FORM|BODY|HTML)$/.test(node.tagName || ""); i += 1, node = node.parentElement) {
+      const controls = Array.from(
+        node.querySelectorAll("input, [role='checkbox'], [role='radio']")
+      ).filter((control) => {
+        const controlType = String(control.type || control.getAttribute("role") || "").toLowerCase();
+        return controlType === "checkbox" || controlType === "radio";
+      });
+      if (controls.length === 1) texts.push(node.innerText || node.textContent || "");
+    }
+
+    return texts
+      .map((text) => String(text || "").replace(/\s+/g, " ").trim())
+      .filter((text) => text.length >= 8 && text.length <= 500)
+      .sort((a, b) => b.length - a.length)[0] || "";
   }
   function inspect(el) {
     const tag = (el.tagName || "").toLowerCase();
@@ -154,9 +179,9 @@
       (role === "checkbox" || role === "radio" ? role : tag === "textarea" ? "textarea" : tag === "select" ? "select" : "text")
     ).toLowerCase();
     let label = type === "radio" || type === "checkbox" ? optionLabel(el) : associatedLabel(el);
-    if ((type === "checkbox" || type === "radio") && label.length < 12) {
-      const nearby = nearbyConsentText(el);
-      if (nearby.length > label.length) label = nearby;
+    const context = type === "checkbox" || type === "radio" ? nearbyConsentText(el) : "";
+    if (type === "checkbox" || type === "radio") {
+      label = FMMatcher.preferredCheckboxLabel(label, context);
     }
     const checked =
       type === "checkbox" || type === "radio"
@@ -176,8 +201,10 @@
       value: type === "checkbox" || type === "radio" ? el.getAttribute("value") || el.value || "" : "",
       groupName: type === "radio" ? el.name || "" : "",
       groupLabel: type === "radio" ? findQuestion(el) : tag === "select" ? findBirthdayContext(el) : "",
+      context,
       disabled: !!el.disabled,
       readOnly: !!el.readOnly,
+      required: !!(el.required || el.getAttribute("aria-required") === "true"),
       checked
     };
   }
@@ -265,8 +292,10 @@
           (el.id && el.ownerDocument.querySelector(`label[for="${cssEscape(el.id)}"]`));
         if (label) label.click();
         else el.click();
-        if (el.checked !== want) {
-          el.checked = want;
+        const nowOn = !!(el.checked || el.getAttribute("aria-checked") === "true");
+        if (nowOn !== want) {
+          if ("checked" in el) el.checked = want;
+          else el.setAttribute("aria-checked", String(want));
           fire(el);
         }
       } finally {
@@ -287,8 +316,10 @@
           (el.id && el.ownerDocument.querySelector(`label[for="${cssEscape(el.id)}"]`));
         if (label) label.click();
         else el.click();
-        if (!el.checked) {
-          el.checked = true;
+        const nowOn = !!(el.checked || el.getAttribute("aria-checked") === "true");
+        if (!nowOn) {
+          if ("checked" in el) el.checked = true;
+          else el.setAttribute("aria-checked", "true");
           fire(el);
         }
       } finally {
@@ -358,9 +389,7 @@
     for (const el of collectFields()) {
       const info = inspect(el);
       const resolved = FMMatcher.resolveValue(info, state.identity, site.fields, state.settings, state.cleared);
-      if (!force && resolved.kind === "checkbox" && (resolved.semantic === "agreeToRules" || resolved.role === "agreement")) {
-        continue;
-      }
+      if (!force && !FMMatcher.shouldFillResolvedValue(resolved)) continue;
       if (force && String(el.value || "").trim() && resolved.value) {
         delete el.dataset.fmUserEdited;
       }

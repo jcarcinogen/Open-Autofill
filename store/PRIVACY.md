@@ -1,6 +1,6 @@
 # Open Autofill — Privacy Policy
 
-Last updated: August 30, 2026
+Last updated: September 2, 2026
 
 Public HTTPS copy: https://jcarcinogen.github.io/Open-Autofill/privacy.html
 
@@ -43,7 +43,7 @@ Open Autofill can run on websites so it can fill forms. Page contents are proces
 
 ## Contact
 
-Questions about this policy: [scottdangel+openautofill@gmail.com](mailto:scottdangel+openautofill@gmail.com)
+Questions about this policy: [GitHub issues](https://github.com/jcarcinogen/Open-Autofill/issues)
 
 ## Changes
 

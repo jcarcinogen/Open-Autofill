@@ -54,4 +54,5 @@ Productivity / Tools
 - Small promo tile: `store/screenshots/promo-440x280.png`
 - Store icon: `icons/icon128.png`
 - Package contents: `manifest.json`, `src/`, and `icons/` only
-- Support email: scottdangel+openautofill@gmail.com
+- Support email (Chrome Web Store required field only; not shown on GitHub Pages): scottdangel+openautofill@gmail.com
+- Support URL: https://github.com/jcarcinogen/Open-Autofill/issues

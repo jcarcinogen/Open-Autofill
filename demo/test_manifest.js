@@ -16,4 +16,21 @@ assert(
   manifest.host_permissions.slice().sort().join(",") === ["http://*/*", "https://*/*"].sort().join(","),
   "host access stays limited to pages the form filler can operate on"
 );
+
+const publicCopy = [
+  "docs/index.html",
+  "docs/privacy.html",
+  "src/privacy.html",
+  "store/PRIVACY.md"
+]
+  .map((file) => fs.readFileSync(path.join(__dirname, "..", file), "utf8"))
+  .join("\n");
+assert(
+  !/mailto:scottdangel\+openautofill@gmail\.com/.test(publicCopy),
+  "public site and in-extension privacy use GitHub for support, not a harvestable mailto"
+);
+assert(
+  /scottdangel\+openautofill@gmail\.com/.test(fs.readFileSync(path.join(__dirname, "..", "store/LISTING.md"), "utf8")),
+  "Chrome Web Store listing copy still has the required support email"
+);
 console.log("ok");

@@ -1,4 +1,73 @@
-/* Open Autofill — service worker. */
+/* Open Autofill — the only durable writer. */
+importScripts("shared.js", "matcher.js");
+const enqueueMutation = FM.createSerialTaskQueue();
+function isUI(sender) {
+  return sender.id === chrome.runtime.id && ["src/options.html", "src/popup.html"].some(p => sender.url === chrome.runtime.getURL(p));
+}
+async function pageOrigin(sender, state) {
+  if (sender.id !== chrome.runtime.id || !sender.tab || !Number.isInteger(sender.tab.id)) throw new Error("Unauthorized page");
+  const tab = await chrome.tabs.get(sender.tab.id);
+  const origin = FM.originFromUrl(sender.url);
+  if (!origin || origin !== FM.originFromUrl(tab.url) || (sender.origin && sender.origin !== origin)) throw new Error("Cross-origin frames are skipped");
+  if (!state.settings.consented || FM.isExcluded(state.settings, FM.hostFromUrl(tab.url))) throw new Error("Form memory disabled on this page");
+  return origin;
+}
+async function readState(sender) {
+  const state = await FM.loadStoredState();
+  if (isUI(sender)) { const raw = await chrome.storage.local.get("recovery"); return {state:{...state,hasRecovery:!!raw.recovery}}; }
+  const origin = await pageOrigin(sender, state);
+  return {state:{...state, sites:{[origin]:state.sites[origin] || {forms:{}}}, legacySites:{}, hybridOrigins:{}}};
+}
+async function mutate(msg, sender) {
+  const state = await FM.loadStoredState();
+  if (msg.op === "learn") {
+    const origin = await pageOrigin(sender,state);
+    if (msg.epoch !== state.epoch) throw new Error("Stale edits discarded; reload the page");
+    if (!state.settings.autoLearn && !msg.explicit) throw new Error("Automatic learning disabled");
+    if (typeof msg.scope !== "string" || !msg.scope || msg.scope.length > 4000 || !Array.isArray(msg.edits) || msg.edits.length > 200) throw new Error("Invalid edits");
+    const rec = state.sites[origin] || {forms:{}};
+    let fields = rec.forms[msg.scope]?.fields || [];
+    let saved = 0;
+    for (const edit of msg.edits) {
+      if (!FM.isRecord(edit.info) || !["string","boolean"].includes(typeof edit.value) || String(edit.value).length > 2000 || JSON.stringify(edit.info).length > 16000) throw new Error("Invalid edit");
+      const learned = FMMatcher.learnFromField(edit.info, edit.value, state.identity, fields, state.settings, {cleared:state.cleared});
+      fields = learned.siteFields; if (learned.learned) saved++;
+    }
+    rec.forms[msg.scope] = {fields, lastSaved:new Date().toISOString()};
+    state.sites[origin] = rec; state.revision++;
+    await chrome.storage.local.set(state);
+    return {ok:true,saved,epoch:state.epoch};
+  }
+  if (!isUI(sender)) throw new Error("Unauthorized mutation");
+  if (msg.op === "identity") {
+    if (!FM.IDENTITY_FIELDS.some(f => f.key === msg.key) || typeof msg.value !== "string" || msg.value.length > 500) throw new Error("Invalid identity patch");
+    state.identity[msg.key] = msg.value;
+    if (msg.value) delete state.cleared[msg.key];
+    else {
+      state.cleared[msg.key] = true;
+      state.sites = FM.stripSemanticFromSites(state.sites, msg.key);
+      state.epoch += 1;
+    }
+  } else if (msg.op === "settings") {
+    if (!FM.isRecord(msg.patch)) throw new Error("Invalid settings patch");
+    state.settings = FM.normalizeBackupState({settings:{...state.settings,...msg.patch}}).settings;
+  } else if (msg.op === "restore" || msg.op === "undo") {
+    if (msg.confirmed !== true) throw new Error("Replacement confirmation required");
+    const raw = await chrome.storage.local.get("recovery");
+    const restored = FM.parseBackup(msg.op === "restore" ? msg.backup : raw.recovery);
+    restored.epoch = state.epoch + 1; restored.revision = state.revision + 1;
+    await chrome.storage.local.set({...restored,recovery:msg.op === "restore" ? FM.createBackup(state) : null});
+    return {ok:true,epoch:restored.epoch,revision:restored.revision};
+  } else if (msg.op === "discardRecovery") {
+    await chrome.storage.local.set({recovery:null}); return {ok:true};
+  } else if (msg.op === "forget") {
+    if (typeof msg.origin !== "string") throw new Error("Invalid origin");
+    delete state.sites[msg.origin]; delete state.legacySites[msg.origin]; state.epoch++;
+  } else throw new Error("Unknown mutation");
+  state.revision += 1;
+  await chrome.storage.local.set(state);
+  return {ok:true, epoch:state.epoch, revision:state.revision};
+}
 const MENU = {
   fill: "fm-fill",
   remember: "fm-remember",
@@ -14,51 +83,9 @@ chrome.runtime.onInstalled.addListener(async () => {
     chrome.contextMenus.create({ id: MENU.options, title: "Open Autofill settings", contexts: ["action", "page"] });
   });
 
-  const existing = await chrome.storage.local.get(["settings", "identity", "sites"]);
-  const patch = {};
-  if (!existing.settings) {
-    patch.settings = {
-      autoFill: true,
-      autoLearn: true,
-      highlightFilled: true,
-      skipPasswords: true,
-      skipPaymentAndSsn: true,
-      fillDelayMs: 150,
-      excludedHosts: [],
-      consented: false
-    };
-  }
-  if (!existing.identity) {
-    patch.identity = {
-      email: "",
-      firstName: "",
-      middleName: "",
-      lastName: "",
-      fullName: "",
-      nickname: "",
-      phone: "",
-      address1: "",
-      address2: "",
-      city: "",
-      state: "",
-      zip: "",
-      country: "",
-      instagram: "",
-      threads: "",
-      bluesky: "",
-      twitter: "",
-      tiktok: "",
-      facebook: "",
-      youtube: "",
-      birthday: "",
-      age: "",
-      gender: "",
-      company: "",
-      website: ""
-    };
-  }
-  if (!existing.sites) patch.sites = {};
-  if (Object.keys(patch).length) await chrome.storage.local.set(patch);
+  await enqueueMutation(async () => { await chrome.storage.local.set(await FM.loadStoredState()); });
+  // Page scripts must use the authorized worker rather than reading all identities/sites directly.
+  if (chrome.storage.local.setAccessLevel) await chrome.storage.local.setAccessLevel({accessLevel:"TRUSTED_CONTEXTS"});
 });
 
 async function sendToActiveTab(type) {
@@ -95,12 +122,12 @@ async function excludeActiveHost() {
   } catch {
     return { error: "Could not read this site." };
   }
-  const raw = await chrome.storage.local.get("settings");
-  const settings = raw.settings || {};
-  const excluded = new Set(settings.excludedHosts || []);
-  excluded.add(host);
-  settings.excludedHosts = Array.from(excluded);
-  await chrome.storage.local.set({ settings });
+  await enqueueMutation(async () => {
+    const state = await FM.loadStoredState();
+    state.settings.excludedHosts = [...new Set([...state.settings.excludedHosts,host])];
+    state.epoch++; state.revision++;
+    await chrome.storage.local.set(state);
+  });
   return { host, excluded: true };
 }
 
@@ -117,7 +144,14 @@ chrome.commands.onCommand.addListener((command) => {
 });
 
 chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
-  if (!msg || !msg.type) return;
+  if (msg && msg.type === "fm.state") {
+    enqueueMutation(() => readState(_sender)).then(sendResponse, e => sendResponse({error:e.message})); return true;
+  }
+  if (msg && msg.type === "fm.mutate") {
+    enqueueMutation(() => mutate(msg, _sender)).then(sendResponse, e => sendResponse({error:e.message}));
+    return true;
+  }
+  if (!msg || !msg.type || !isUI(_sender)) return;
   if (msg.type === "fm.fill") {
     sendToActiveTab("fm.fill").then(sendResponse);
     return true;

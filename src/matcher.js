@@ -230,11 +230,26 @@
   }
 
   function selectOptionMatches(resolved, option) {
+    if (resolved && resolved.source === "site") {
+      return option != null && option.value === resolved.value;
+    }
     const want = norm(resolved && resolved.value);
     const optionValue = norm(option && option.value);
     const optionText = norm(option && option.text);
-    if (optionValue === want || optionText === want) return true;
     const semantic = normalizeSemantic(resolved && resolved.semantic);
+    if (semantic === "birthdayMonth") {
+      const monthNumber = (value) => {
+        if (/^\d+$/.test(value) && Number(value) >= 1 && Number(value) <= 12) return Number(value);
+        const months = ["january", "february", "march", "april", "may", "june", "july", "august", "september", "october", "november", "december"];
+        const index = months.findIndex((month) => value.toLowerCase() === month || value.toLowerCase() === month.slice(0, 3));
+        return index < 0 ? null : index + 1;
+      };
+      const wanted = monthNumber(want);
+      const labelMonth = monthNumber(optionText);
+      if (wanted && labelMonth) return wanted === labelMonth;
+      if (wanted) return wanted === monthNumber(optionValue);
+    }
+    if (optionValue === want || optionText === want) return true;
     if (semantic === "state") {
       const regionCode = (value) => {
         const lower = norm(value).toLowerCase().replace(/\s+/g, " ");
@@ -311,6 +326,8 @@
     const context = norm(info.context);
     const directIsMeaningful = directLabel.length >= 8;
     if (MARKETING_RE.test(ownText) || (!directIsMeaningful && MARKETING_RE.test(context))) return "marketing";
+    const eligibilityText = directLabel || context;
+    if (/(eligib|resident|residency|age\s+of\s+majority|\bage\b|\b(?:over|under|at least)\s+\d+|\d+\s*(?:years|or older)|\bi (?:am|certify|confirm|attest)\b)/i.test(eligibilityText)) return "other";
     const hasAgreement = AGREEMENT_RE.test(ownText) || (!directIsMeaningful && AGREEMENT_RE.test(context));
     if (hasAgreement && checkboxAgreementIsRequired(info)) return "agreement";
     return "other";
@@ -496,6 +513,11 @@
 
   function siteFieldKeyMatches(field, keys, kind) {
     const storedKeys = [field.key, ...(field.aliases || [])].filter(Boolean);
+    if (kind === "checkbox") {
+      const question = keys.filter((key) => /^(label|aria):/.test(key));
+      const storedQuestion = storedKeys.filter((key) => /^(label|aria):/.test(key));
+      if (question.length || storedQuestion.length) return question.some((key) => storedQuestion.includes(key));
+    }
     if (kind === "radio") {
       const currentName = keys.find((key) => key.startsWith("radioname:"));
       const storedName = storedKeys.find((key) => key.startsWith("radioname:"));
@@ -527,16 +549,42 @@
     );
   }
 
+  function parseBirthday(value) {
+    const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(String(value || ""));
+    if (!match) return null;
+    const year = Number(match[1]), month = Number(match[2]), day = Number(match[3]);
+    const leap = year % 4 === 0 && (year % 100 !== 0 || year % 400 === 0);
+    const days = [31, leap ? 29 : 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31];
+    return year > 0 && month >= 1 && month <= 12 && day >= 1 && day <= days[month - 1] ? match : null;
+  }
+
+  function formatBirthday(value, info) {
+    if (!parseBirthday(value)) return "";
+    if (String(info.type).toLowerCase() === "date") return value;
+    const hint = [info.placeholder, info.label, info.ariaLabel, info.dateFormat].map(norm).join(" ").toUpperCase();
+    const formats = [...hint.matchAll(/(?:MM([/.-])DD\1YYYY|DD([/.-])MM\2YYYY|YYYY([/.-])MM\3DD)/g)];
+    if (new Set(formats.map((match) => match[0])).size > 1) return "";
+    const format = formats[0];
+    if (!format) return value;
+    const [year, month, day] = value.split("-");
+    return format[0].replace("YYYY", year).replace("MM", month).replace("DD", day);
+  }
+
   function resolveValue(info, identity, siteFields, settings, cleared) {
     const meta = classify(info, settings);
     if (meta.skip) return { ...meta, value: "", source: null };
 
-    if (meta.kind === "checkbox" && meta.role === "agreement") {
-      const agreed = identityValue(identity, "agreeToRules");
-      if (isCheckedValue(agreed)) return { ...meta, value: "true", source: "identity" };
-    }
-
+    const clearKey = isBirthdayPartSemantic(meta.semantic) ? "birthday" : meta.semantic;
+    if (clearKey && cleared && cleared[clearKey]) return { ...meta, value: "", source: null, suppressed: true };
     const site = lookupSiteValue(siteFields, meta.siteKeys, meta.semantic, meta.kind);
+    if (site && site.value === "") return { ...meta, value: "", source: "site", suppressed: true };
+    if (meta.kind === "checkbox") {
+      if (site && site.value !== undefined) return { ...meta, value: site.value, source: "site" };
+      if (meta.role === "agreement" && isCheckedValue(identityValue(identity, "agreeToRules"))) {
+        return { ...meta, value: "true", source: "identity" };
+      }
+      return { ...meta, value: "", source: null };
+    }
     if (meta.kind === "radio") {
       if (site && radioMatches(info, site)) {
         return {
@@ -555,7 +603,7 @@
         return { ...meta, value: site.value, optionLabel: site.optionLabel, source: "site" };
       }
       const birthday = identityValue(identity, "birthday");
-      const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(birthday);
+      const match = parseBirthday(birthday);
       if (match) {
         const part = { birthdayYear: match[1], birthdayMonth: match[2], birthdayDay: match[3] }[meta.semantic];
         return { ...meta, value: part || "", source: part ? "identity" : null };
@@ -568,7 +616,8 @@
       if (site && site.override === true && site.value !== undefined && site.value !== "") {
         return { ...meta, value: site.value, optionLabel: site.optionLabel, source: "site" };
       }
-      const value = identityValue(identity, meta.semantic);
+      const raw = identityValue(identity, meta.semantic);
+      const value = meta.semantic === "birthday" && raw ? formatBirthday(raw, info) : raw;
       if (value) return { ...meta, value, source: "identity" };
       return { ...meta, value: "", source: null };
     }
@@ -593,7 +642,6 @@
   function learnFromField(info, value, identity, siteFields, settings, options) {
     const opts = options || {};
     const cleared = { ...(opts.cleared || {}) };
-    const overwriteIdentity = !!opts.overwriteIdentity;
     const meta = classify(info, settings);
     const nextIdentity = { ...identity };
     const nextSite = Array.isArray(siteFields) ? siteFields.slice() : [];
@@ -601,7 +649,7 @@
     if (meta.skip || meta.sensitive) {
       return { identity: nextIdentity, siteFields: nextSite, cleared, learned: null };
     }
-    if (trimmed === "" && meta.kind !== "checkbox") {
+    if (trimmed === "" && meta.kind === "radio") {
       return { identity: nextIdentity, siteFields: nextSite, cleared, learned: null };
     }
     if (meta.kind === "radio" && (value === false || value === "false")) {
@@ -610,26 +658,6 @@
 
     let learned = null;
     const checked = isCheckedValue(value);
-    if (overwriteIdentity && isBirthdayPartSemantic(meta.semantic)) delete cleared.birthday;
-    if (meta.kind === "checkbox" && meta.role === "agreement" && checked) {
-      nextIdentity.agreeToRules = "true";
-      delete cleared.agreeToRules;
-      learned = { target: "identity", key: "agreeToRules", value: "true" };
-    } else if (
-      meta.semantic &&
-      !isBirthdayPartSemantic(meta.semantic) &&
-      (meta.kind === "text" || meta.kind === "select")
-    ) {
-      const existing = identityValue(identity, meta.semantic);
-      const blocked = !!cleared[meta.semantic];
-      const supportsSiteOverride = meta.semantic === "email" || meta.semantic === "phone";
-      if ((!blocked || overwriteIdentity) && (!existing || (overwriteIdentity && !supportsSiteOverride))) {
-        nextIdentity[meta.semantic] = trimmed;
-        delete cleared[meta.semantic];
-        learned = { target: "identity", key: meta.semantic, value: trimmed };
-      }
-    }
-
     const keys = meta.siteKeys || [];
     const existingIdx = keys.length
       ? nextSite.findIndex(
@@ -639,18 +667,11 @@
         )
       : -1;
 
-    // Do not snapshot "unchecked" as a remembered value — that blocked Official
-    // Rules boxes on later visits when the page used a new random field id.
-    if (meta.kind === "checkbox" && !checked && existingIdx < 0) {
-      return { identity: nextIdentity, siteFields: nextSite, cleared, learned };
-    }
-
     if (keys.length) {
       const usualValue = meta.semantic ? identityValue(identity, meta.semantic) : "";
       const siteOverride =
-        (meta.semantic === "email" || meta.semantic === "phone") &&
+        !!meta.semantic &&
         meta.kind !== "checkbox" &&
-        !!usualValue &&
         !semanticValuesEqual(meta.semantic, usualValue, trimmed);
       const rec = {
         key: keys[0],

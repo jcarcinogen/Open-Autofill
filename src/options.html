@@ -35,7 +35,7 @@
 
       <section>
         <h2>Identity profile</h2>
-        <p class="muted">Used by default. If you enter a different email or phone on one site, that site-specific answer takes priority there.</p>
+        <p class="muted">Global answers change only here or in the popup. Genuine edits on a form stay local to that exact origin and form. Birthday is stored as YYYY-MM-DD and formatted for recognized date fields.</p>
         <div id="identity" class="grid"></div>
       </section>
 
@@ -47,7 +47,7 @@
 
       <section>
         <h2>Remembered site fields</h2>
-        <p class="muted">One-off questions and site-specific overrides live here, keyed to the website.</p>
+        <p class="muted">Local answers are scoped to the exact origin and form. Legacy hostname records remain inactive. Forgetting does not delete downloaded backups; delete recovery separately if needed.</p>
         <div id="sites"></div>
       </section>
 
@@ -63,6 +63,13 @@
             <input type="file" id="import" accept="application/json" />
           </label>
         </div>
+        <div id="restorePreview" hidden>
+          <p id="previewCounts"></p>
+          <button id="confirmRestore" class="danger">Confirm replacement</button>
+          <button id="cancelRestore">Cancel</button>
+        </div>
+        <div class="row"><button id="undoRestore" disabled>Undo restore</button><button id="discardRecovery" disabled>Delete recovery snapshot</button></div>
+        <p class="muted">Backups contain personal data. Store them privately. Recovery stays in this profile until undo, replacement, or deletion.</p>
         <p id="backupStatus" class="muted" role="status" aria-live="polite" hidden></p>
       </section>
 

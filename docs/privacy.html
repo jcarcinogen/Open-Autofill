@@ -76,19 +76,19 @@
       <p class="nav"><a href="index.html">← Open Autofill</a></p>
       <article class="card">
         <h1>Privacy Policy</h1>
-        <p class="meta">Last updated: September 2, 2026</p>
+        <p class="meta">Last updated: September 6, 2026</p>
         <p>
           Open Autofill is a free browser extension. Form answers are stored in this Chrome profile.
           <strong>The extension does not send your answers to the developer or to any Open Autofill server.</strong>
-          Websites you fill or submit may receive the values you chose to put in their forms.
+          Website scripts can read autofilled values before you submit a form. Local-only storage does not prevent that disclosure.
         </p>
 
         <h2>Data we store</h2>
         <ul>
           <li>Identity fields you enter (for example email, name, address, phone, social handles)</li>
           <li>Per-website extra fields, field labels, and Official Rules / I-agree checkboxes you have used</li>
-          <li>Website hostnames for remembered or ignored sites</li>
-          <li>Settings (auto-fill on/off, ignored sites)</li>
+          <li>Website origins (scheme, hostname and port), form/field identifiers, and ignored hostnames</li>
+          <li>Settings, cleared-answer markers, preserved legacy records, and a local pre-restore recovery snapshot</li>
         </ul>
         <p>
           This data is stored in <strong>Chrome local extension storage on this computer / profile</strong>.
@@ -120,8 +120,7 @@
 
         <h2>JSON backup</h2>
         <p>
-          Export downloads a JSON file to your computer. Import reads a JSON file you select.
-          Those files are yours. We never receive them.
+          Export downloads a versioned, timestamped JSON file. Import validates and previews a replacement before you confirm. A local recovery snapshot supports undoing a restore. Backups contain personal answers in readable text; store them privately. We never receive them.
         </p>
 
         <h2>Permissions</h2>

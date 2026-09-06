@@ -156,8 +156,8 @@ for (const [field, value] of [
   welchsIdentity = learned.identity;
   welchsSiteFields = learned.siteFields;
 }
-assert(welchsIdentity.email === "scott@example.com", "Welch's email is learned");
-assert(welchsIdentity.agreeToRules === "true", "Welch's Official Rules agreement is learned");
+assert(!welchsIdentity.email, "email learning stays local");
+assert(!welchsIdentity.agreeToRules, "agreement learning stays local");
 assert(
   ["birthdayMonth", "birthdayDay", "birthdayYear"].every((semantic) =>
     welchsSiteFields.some((field) => field.semantic === semantic)
@@ -168,13 +168,13 @@ const manuallyRestoredEmail = M.learnFromField(welchsEmail, "scott@example.com",
   overwriteIdentity: true,
   cleared: { email: true }
 });
-assert(manuallyRestoredEmail.identity.email === "scott@example.com", "manual Remember restores a previously cleared email");
-assert(!manuallyRestoredEmail.cleared.email, "manual Remember removes the email clear marker");
+assert(!manuallyRestoredEmail.identity.email, "Remember cannot restore global email");
+assert(manuallyRestoredEmail.cleared.email, "Remember retains email clear marker");
 const manuallyRestoredDob = M.learnFromField(welchsDobMonth, "02", {}, [], {}, {
   overwriteIdentity: true,
   cleared: { birthday: true }
 });
-assert(!manuallyRestoredDob.cleared.birthday, "manual Remember makes explicitly entered DOB parts fillable again");
+assert(manuallyRestoredDob.cleared.birthday, "Remember retains birthday clear marker");
 const welchsLegacyDobFields = [
   { key: "name:dob_m", aliases: ["id:dob_m", "label:date of birth"], semantic: "birthday", type: "select", value: "02" },
   { key: "name:dob_d", aliases: ["id:dob_d", "label:date of birth - day"], semantic: "birthday", type: "select", value: "13" },
@@ -459,14 +459,14 @@ const rules = {
 };
 assert(M.checkboxRole(rules) === "agreement", "rules role");
 const learnedRules = M.learnFromField(rules, true, {}, [], settings);
-assert(learnedRules.identity.agreeToRules === "true", "learn agree");
+assert(!learnedRules.identity.agreeToRules, "agreement is not globally learned");
 const otherSite = {
   ...rules,
   name: "terms[]",
   id: "terms_1"
 };
 const fillOther = M.resolveValue(otherSite, learnedRules.identity, [], settings);
-assert(fillOther.value === "true" && fillOther.source === "identity", "cross-site rules");
+assert(!fillOther.value, "page agreement cannot cross sites");
 
 const marketing = {
   tag: "input",
@@ -486,7 +486,7 @@ const fillMarketing = M.resolveValue(marketing, learnedRules.identity, [], setti
 assert(!fillMarketing.value, "do not check marketing");
 
 const rememberedOff = M.learnFromField(marketing, false, learnedRules.identity, [], settings);
-assert(!rememberedOff.siteFields.length, "do not snapshot unchecked");
+assert(rememberedOff.siteFields[0].value === "false", "persist initial unchecked choice");
 
 const cayman = {
   tag: "input",
@@ -503,9 +503,9 @@ const cayman = {
 };
 assert(M.checkboxRole(cayman) === "agreement", "cayman rules");
 assert(M.siteKeys(cayman)[0] === "label:i agree to the official rules.*", "cayman stable key");
-const stale = [{ key: "id:checkbox_1111111111111-CheckboxField", aliases: ["label:i agree to the official rules.*"], type: "checkbox", value: "false", role: "agreement" }];
+const stale = [{ key: "id:checkbox_1111111111111-CheckboxField", aliases: ["label:i agree to the official rules.*"], type: "checkbox", value: "false", role: "agreement", semantic: "agreeToRules" }];
 const caymanFill = M.resolveValue(cayman, { agreeToRules: "true" }, stale, settings);
-assert(caymanFill.value === "true" && caymanFill.source === "identity", "identity beats stale unchecked");
+assert(caymanFill.value === "false" && caymanFill.source === "site", "local unchecked beats settings agreement");
 
 const cjMarketing = {
   tag: "input",
@@ -543,21 +543,21 @@ const requiredEligible = {
   label: "I certify that I am eligible to enter.",
   context: ""
 };
-assert(M.checkboxRole(requiredEligible) === "agreement", "required eligible-to-enter confirmation is treated as consent");
+assert(M.checkboxRole(requiredEligible) === "other", "eligibility cannot use global agreement");
 const contextMarkedEligible = {
   ...requiredEligible,
   required: false,
   context: "Required eligibility confirmation"
 };
 assert(
-  M.checkboxRole(contextMarkedEligible) === "agreement",
-  "explicit required wording in nearby context marks an eligibility confirmation as required"
+  M.checkboxRole(contextMarkedEligible) === "other",
+  "required eligibility remains local-only"
 );
 const ageOfMajority = {
   ...contextOnlyRules,
   context: "I certify that I am a legal resident and have reached the age of majority."
 };
-assert(M.checkboxRole(ageOfMajority) === "agreement", "eligibility confirmation is treated as required consent");
+assert(M.checkboxRole(ageOfMajority) === "other", "age and residency remain local-only");
 const shortDirectAcceptance = {
   ...contextOnlyRules,
   label: "I accept",
@@ -612,7 +612,7 @@ assert(
   "marketing opt-ins stay empty on page load"
 );
 const learnedContextRules = M.learnFromField(contextOnlyRules, true, {}, [], settings);
-assert(learnedContextRules.identity.agreeToRules === "true", "context-only required checkbox is remembered");
+assert(!learnedContextRules.identity.agreeToRules, "context-only choice stays local");
 
 const radioBase = {
   tag: "input",
@@ -693,7 +693,7 @@ const nbc = {
 };
 assert(M.checkboxRole(nbc) === "agreement", "nbc agreed");
 const nbcLearn = M.learnFromField(nbc, true, {}, [], settings);
-assert(nbcLearn.identity.agreeToRules === "true", "nbc sets agree");
+assert(!nbcLearn.identity.agreeToRules, "agreement does not set global identity");
 
 const addr2 = {
   tag: "input",
@@ -720,7 +720,7 @@ assert(!blocked.identity.address2, "cleared blocks auto-learn");
 const manualAddressUpdate = M.learnFromField(addr2, "new apartment", { address2: "old apartment" }, [], settings, {
   overwriteIdentity: true
 });
-assert(manualAddressUpdate.identity.address2 === "new apartment", "manual Remember still updates non-contact identity fields");
+assert(manualAddressUpdate.identity.address2 === "old apartment", "Remember preserves non-contact global identity");
 
 const googleQ = {
   tag: "textarea",

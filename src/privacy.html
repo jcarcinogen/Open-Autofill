@@ -10,13 +10,13 @@
     <main>
       <header>
         <h1>Privacy</h1>
-        <p>Open Autofill is free, local, and offline. There is no account and no cloud copy of your answers. Websites you fill may receive the values you put in their forms.</p>
+        <p>Open Autofill is free, local, and offline. There is no account and no cloud copy of your answers. Website scripts can read autofilled values before submission.</p>
       </header>
       <section>
         <h2>What we store</h2>
         <p class="muted">
           Form answers you type (email, name, address, Instagram, Official Rules checks, and extra per-site fields)
-          are saved in <strong>this browser profile only</strong> using Chrome’s local extension storage.
+          are saved in <strong>this browser profile only</strong> using Chrome’s local extension storage. Site origins, form/field identifiers, settings, cleared markers, preserved legacy records and a local pre-restore recovery snapshot are also stored. Your usual answers change only through settings or an explicit restore, never from page learning.
         </p>
         <p class="muted">
           Open Autofill uses this information only to remember and fill form fields at your direction. Values remain
@@ -27,7 +27,7 @@
         <h2>What we never do</h2>
         <p class="muted">
           No servers. No analytics. No crash reports. No accounts. No sync. We do not sell or share your data.
-          The extension does not upload answers. Websites you fill may receive the values you put in their forms.
+          The extension does not upload answers. Website scripts can read autofilled values before submission.
           A JSON backup stays on your computer unless you copy that file yourself.
         </p>
       </section>
@@ -47,7 +47,7 @@
       <section>
         <h2>Your backups</h2>
         <p class="muted">
-          Export JSON writes a file to your computer. Import reads a file you choose. Neither step uploads anything.
+          Export JSON writes a versioned, timestamped file to your computer. Import validates and previews a replacement before confirmation, with a local recovery snapshot for undo. Neither step uploads anything. These files contain readable personal answers; keep them private.
         </p>
       </section>
       <section>

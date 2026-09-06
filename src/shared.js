@@ -89,6 +89,7 @@
       label: primitiveString(field.label, 300),
       optionLabel: primitiveString(field.optionLabel, 300),
       optionValue: primitiveString(field.optionValue, 300),
+      blocked: field.blocked === true,
       override: field.override === true
     };
   }
@@ -131,25 +132,86 @@
         ]);
       }
     }
-    const sites = Object.fromEntries(siteEntries);
+    const legacySites = Object.fromEntries(siteEntries.filter(([key]) => !originFromUrl(key)));
+    const sites = Object.create(null);
+    for (const [origin, rec] of Object.entries(raw.sites || {})) {
+      if (originFromUrl(origin) !== origin || !isRecord(rec.forms)) continue;
+      const forms = Object.create(null);
+      for (const [scope, form] of Object.entries(rec.forms)) {
+        if (isRecord(form)) forms[scope] = {fields: Array.isArray(form.fields) ? form.fields.map(normalizeSiteField).filter(Boolean) : [], lastSaved: primitiveString(form.lastSaved,40)};
+      }
+      sites[origin] = {forms};
+    }
+    Object.assign(legacySites, isRecord(raw.legacySites) ? raw.legacySites : {});
+    const hybridOrigins = isRecord(raw.hybridOrigins)
+      ? raw.hybridOrigins
+      : isRecord(raw.origins)
+        ? raw.origins
+        : {};
     const rawCleared = isRecord(raw.cleared) ? raw.cleared : {};
     const cleared = {};
     for (const key of Object.keys(identity)) {
       if (rawCleared[key] === true) cleared[key] = true;
     }
-    return { settings, identity, sites, cleared };
+    return { schemaVersion: 2, settings, identity, sites, legacySites, hybridOrigins, cleared, epoch: Number.isSafeInteger(raw.epoch) ? raw.epoch : 0, revision: Number.isSafeInteger(raw.revision) ? raw.revision : 0 };
   }
 
+  const MAX_BACKUP_BYTES = 5 * 1024 * 1024;
+  function createBackup(state) {
+    return {format:"open-autofill",version:1,schemaVersion:2,exportedAt:new Date().toISOString(),state:normalizeBackupState(state)};
+  }
   function parseBackup(value) {
-    if (!isRecord(value)) throw new Error("Not an Open Autofill backup");
-    if (!isRecord(value.settings) && !isRecord(value.identity) && !isRecord(value.sites)) {
-      throw new Error("Not an Open Autofill backup");
+    const invalid = () => { throw new Error("Invalid or unsupported Open Autofill backup"); };
+    if (!isRecord(value) || JSON.stringify(value).length > MAX_BACKUP_BYTES) invalid();
+    const modern = Object.hasOwn(value,"format");
+    if (modern && (value.format !== "open-autofill" || value.version !== 1 || value.schemaVersion !== 2 || typeof value.exportedAt !== "string" || !Number.isFinite(Date.parse(value.exportedAt)))) invalid();
+    const raw = modern ? value.state : value;
+    if (!isRecord(raw) || !isRecord(raw.settings) || !isRecord(raw.identity) || !isRecord(raw.sites) || !isRecord(raw.cleared)) invalid();
+    if (modern && (raw.schemaVersion !== 2 || !isRecord(raw.legacySites) || !Number.isSafeInteger(raw.epoch) || raw.epoch < 0 || !Number.isSafeInteger(raw.revision) || raw.revision < 0)) invalid();
+    function safeKeys(obj, allowed) { for (const k of Object.keys(obj)) if (["__proto__","prototype","constructor"].includes(k) || (allowed && !allowed.includes(k))) invalid(); }
+    safeKeys(raw,["schemaVersion","settings","identity","sites","legacySites","hybridOrigins","origins","cleared","epoch","revision"]);
+    const identityKeys = IDENTITY_FIELDS.map(f => f.key);
+    safeKeys(raw.identity,identityKeys); safeKeys(raw.cleared,identityKeys);
+    if (!Object.keys(raw.settings).length || !Object.keys(raw.identity).length) invalid();
+    for (const [key,v] of Object.entries(raw.identity)) if ((typeof v !== "string" && !(key === "agreeToRules" && typeof v === "boolean")) || String(v).length > 500) invalid();
+    for (const v of Object.values(raw.cleared)) if (v !== true) invalid();
+    safeKeys(raw.settings,[...Object.keys(DEFAULT_SETTINGS),"fillOnAppSites"]);
+    for (const [key,v] of Object.entries(raw.settings)) {
+      if (key === "excludedHosts") { if (!Array.isArray(v) || v.length > 1000 || v.some(h => typeof h !== "string" || h.length > 253)) invalid(); }
+      else if (key === "fillDelayMs") { if (typeof v !== "number" || !Number.isFinite(v) || v < 0 || v > 60000) invalid(); }
+      else if (typeof v !== "boolean") invalid();
     }
-    return normalizeBackupState(value);
+    function validateFields(rec) {
+      if (!isRecord(rec) || !Array.isArray(rec.fields) || rec.fields.length > 10000) invalid();
+      safeKeys(rec,["fields","lastSaved"]);
+      if (rec.lastSaved !== undefined && typeof rec.lastSaved !== "string") invalid();
+      for (const f of rec.fields) {
+        if (!isRecord(f) || typeof f.key !== "string" || !f.key || f.key.length > 300 || !["string","boolean"].includes(typeof f.value) || String(f.value).length > 2000) invalid();
+        safeKeys(f,["key","aliases","type","value","semantic","role","label","optionLabel","optionValue","override","blocked"]);
+        for (const [k,v] of Object.entries(f)) {
+          if (k === "aliases") { if (!Array.isArray(v) || v.length > 100 || v.some(x => typeof x !== "string" || x.length > 300)) invalid(); }
+          else if (["override","blocked"].includes(k)) { if (typeof v !== "boolean") invalid(); }
+          else if (k !== "value" && (typeof v !== "string" || v.length > 300)) invalid();
+        }
+      }
+    }
+    safeKeys(raw.sites);
+    for (const [origin,rec] of Object.entries(raw.sites)) {
+      if (modern) {
+        if (originFromUrl(origin) !== origin || !isRecord(rec) || !isRecord(rec.forms)) invalid();
+        safeKeys(rec,["forms"]); safeKeys(rec.forms);
+        for (const [scope,form] of Object.entries(rec.forms)) { if (!scope || scope.length > 4000) invalid(); validateFields(form); }
+      } else { if (!origin || origin.length > 253) invalid(); validateFields(rec); }
+    }
+    if (raw.legacySites !== undefined) {
+      if (!isRecord(raw.legacySites)) invalid(); safeKeys(raw.legacySites);
+      for (const rec of Object.values(raw.legacySites)) validateFields(rec);
+    }
+    return normalizeBackupState(raw);
   }
 
-  async function loadState() {
-    const raw = await chrome.storage.local.get(["settings", "identity", "sites", "cleared"]);
+  async function loadStoredState() {
+    const raw = await chrome.storage.local.get(null);
     return normalizeBackupState(raw);
   }
 
@@ -158,31 +220,28 @@
     const removesSemantic = (fieldSemantic) =>
       fieldSemantic === semantic ||
       (semantic === "birthday" && /^birthday(?:Month|Day|Year|-(?:month|day|year))$/.test(String(fieldSemantic || "")));
-    for (const [host, rec] of Object.entries(sites || {})) {
-      next[host] = {
-        ...rec,
-        fields: (rec.fields || []).filter((f) => !removesSemantic(f.semantic))
-      };
+    for (const [origin, rec] of Object.entries(sites || {})) {
+      if (rec && rec.forms) {
+        const forms = {};
+        for (const [scope, form] of Object.entries(rec.forms)) {
+          forms[scope] = {
+            ...form,
+            fields: (form.fields || []).filter((f) => !removesSemantic(f.semantic))
+          };
+        }
+        next[origin] = { ...rec, forms };
+      } else {
+        next[origin] = {
+          ...rec,
+          fields: (rec.fields || []).filter((f) => !removesSemantic(f.semantic))
+        };
+      }
     }
     return next;
   }
 
-  async function setIdentityValue(key, value) {
-    const state = await loadState();
-    const identity = { ...state.identity, [key]: value };
-    const cleared = { ...(state.cleared || {}) };
-    let sites = state.sites;
-    if (value) delete cleared[key];
-    else {
-      cleared[key] = true;
-      sites = stripSemanticFromSites(sites, key);
-    }
-    await saveState({ identity, cleared, sites });
-  }
-
-  async function saveState(partial) {
-    await chrome.storage.local.set(partial);
-  }
+  async function setIdentityValue(key, value) { return mutate("identity", {key,value}); }
+  async function saveState() { throw new Error("Use a narrow worker mutation"); }
 
   function createSerialTaskQueue() {
     let tail = Promise.resolve();
@@ -193,6 +252,16 @@
     };
   }
 
+  function originFromUrl(url) {
+    try { const u = new URL(url); return /^https?:$/.test(u.protocol) ? u.origin : ""; } catch { return ""; }
+  }
+  async function request(message) {
+    const result = await chrome.runtime.sendMessage(message);
+    if (!result || result.error) throw new Error(result?.error || "Worker did not respond");
+    return result;
+  }
+  async function loadState() { return (await request({type:"fm.state"})).state; }
+  async function mutate(op, args = {}) { return request({type:"fm.mutate", op, ...args}); }
   function hostFromUrl(url) {
     try {
       return new URL(url).hostname.replace(/^www\./, "");
@@ -231,7 +300,13 @@
     emptyIdentity,
     normalizeBackupState,
     parseBackup,
+    createBackup,
+    MAX_BACKUP_BYTES,
     loadState,
+    mutate,
+    originFromUrl,
+    loadStoredState,
+    isRecord,
     saveState,
     createSerialTaskQueue,
     setIdentityValue,

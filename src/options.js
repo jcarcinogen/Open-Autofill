@@ -11,6 +11,8 @@ async function render() {
     document.getElementById(id).checked = !!state.settings[id];
   }
   excludedEl.value = (state.settings.excludedHosts || []).join("\n");
+  document.getElementById("undoRestore").disabled = !state.hasRecovery;
+  document.getElementById("discardRecovery").disabled = !state.hasRecovery;
 
   identityEl.innerHTML = "";
   for (const field of FM.IDENTITY_FIELDS) {
@@ -26,7 +28,8 @@ async function render() {
         await FM.setIdentityValue(field.key, input.checked ? "true" : "");
       });
     } else {
-      input.type = field.key === "email" ? "email" : "text";
+      input.type = field.key === "birthday" ? "date" : field.key === "email" ? "email" : "text";
+      if (field.key === "birthday") input.title = "ISO date: YYYY-MM-DD. Other forms are formatted automatically.";
       input.placeholder = field.placeholder;
       input.value = state.identity[field.key] || "";
       input.addEventListener("change", async () => {
@@ -37,32 +40,32 @@ async function render() {
   }
 
   sitesEl.innerHTML = "";
-  const hosts = Object.keys(state.sites).sort();
+  const hosts = [...Object.keys(state.sites),...Object.keys(state.legacySites)].sort();
   if (!hosts.length) {
     sitesEl.innerHTML = "<p class='muted'>Nothing site-specific yet. Fill a form once and it will show up here.</p>";
     return;
   }
   for (const host of hosts) {
-    const rec = state.sites[host] || { fields: [] };
+    const rec = state.sites[host] || state.legacySites[host];
+    const fields = rec.forms ? Object.entries(rec.forms).flatMap(([scope,form]) => form.fields.map(f => ({...f,scope}))) : rec.fields;
     const box = document.createElement("article");
     box.className = "site";
     const header = document.createElement("header");
     const title = document.createElement("strong");
-    title.textContent = host;
+    title.textContent = host + (rec.forms ? "" : " — legacy, inactive");
     const del = document.createElement("button");
     del.className = "danger";
     del.textContent = "Forget site";
     del.addEventListener("click", async () => {
-      const current = await FM.loadState();
-      delete current.sites[host];
-      await FM.saveState({ sites: current.sites });
+      await FM.mutate("forget", {origin:host});
       render();
     });
     header.append(title, del);
     const list = document.createElement("ul");
-    for (const field of rec.fields || []) {
+    for (const field of fields || []) {
       const li = document.createElement("li");
-      li.append(document.createTextNode(`${field.label || field.key}: ${field.value}`));
+      li.append(document.createTextNode(`${field.label || field.key}: ${field.blocked ? "Leave blank" : field.value}`));
+      if (field.scope) li.title = "Form scope: " + field.scope;
       if (field.override === true) {
         const badge = document.createElement("span");
         badge.className = "override-badge";
@@ -83,19 +86,12 @@ async function render() {
 
 for (const id of SETTING_IDS) {
   document.getElementById(id).addEventListener("change", async (e) => {
-    const state = await FM.loadState();
-    state.settings[id] = e.target.checked;
-    await FM.saveState({ settings: state.settings });
+    await FM.mutate("settings", {patch:{[id]:e.target.checked}});
   });
 }
 
 excludedEl.addEventListener("change", async () => {
-  const state = await FM.loadState();
-  state.settings.excludedHosts = excludedEl.value
-    .split("\n")
-    .map((s) => s.trim())
-    .filter(Boolean);
-  await FM.saveState({ settings: state.settings });
+  await FM.mutate("settings",{patch:{excludedHosts:excludedEl.value.split("\n").map(s=>s.trim()).filter(Boolean)}});
 });
 
 function setBackupStatus(text) {
@@ -104,34 +100,49 @@ function setBackupStatus(text) {
   el.textContent = text;
 }
 
+let pendingBackup = null;
 document.getElementById("export").addEventListener("click", async () => {
-  const state = await FM.loadState();
-  const blob = new Blob([JSON.stringify(state, null, 2)], { type: "application/json" });
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement("a");
-  a.href = url;
-  a.download = "open-autofill-backup.json";
-  a.click();
-  URL.revokeObjectURL(url);
-  const sites = Object.keys(state.sites || {}).length;
-  setBackupStatus(`Saved open-autofill-backup.json on this computer. ${sites} site(s). Nothing was uploaded.`);
-});
-
-document.getElementById("import").addEventListener("change", async (e) => {
-  const file = e.target.files && e.target.files[0];
-  if (!file) return;
   try {
-    const text = await file.text();
-    const data = JSON.parse(text);
-    const imported = FM.parseBackup(data);
-    await FM.saveState(imported);
-    const sites = Object.keys(imported.sites).length;
-    setBackupStatus(`Imported “${file.name}” from disk. ${sites} site(s). Nothing was uploaded.`);
-    render();
-  } catch (err) {
-    setBackupStatus("Could not read that file. It needs to be an Open Autofill JSON export.");
-  }
+    const state = await FM.loadState(), backup = FM.createBackup(state);
+    const filename = "open-autofill-backup-" + backup.exportedAt.replace(/[:.]/g,"-") + ".json";
+    const url = URL.createObjectURL(new Blob([JSON.stringify(backup,null,2)],{type:"application/json"}));
+    const a = document.createElement("a"); a.href=url; a.download=filename; a.click();
+    setTimeout(()=>URL.revokeObjectURL(url),1000);
+    setBackupStatus(`Saved ${filename}. Contains personal data; keep it private. Nothing uploaded.`);
+  } catch(e) { setBackupStatus(e.message); }
+});
+document.getElementById("import").addEventListener("change", async e => {
+  pendingBackup = null; document.getElementById("restorePreview").hidden = true;
+  const file = e.target.files?.[0]; if (!file) return;
+  try {
+    if (file.size > FM.MAX_BACKUP_BYTES) throw new Error("Backup exceeds the 5 MB limit");
+    const data = JSON.parse(await file.text()), state = FM.parseBackup(data);
+    const forms = Object.values(state.sites).flatMap(s=>Object.values(s.forms));
+    pendingBackup = data;
+    document.getElementById("previewCounts").textContent = `${Object.values(state.identity).filter(Boolean).length} identity answers, ${Object.keys(state.sites).length} origins, ${forms.length} forms, ${forms.reduce((n,f)=>n+f.fields.length,0)} local answers, ${Object.keys(state.legacySites).length} inactive legacy sites. Replace all current identity, settings, clear markers and site memory? A recovery snapshot will be saved.`;
+    document.getElementById("restorePreview").hidden = false;
+    setBackupStatus("Preview only — nothing changed.");
+  } catch(error) { setBackupStatus("Could not read backup: " + error.message); }
   e.target.value = "";
 });
-
-render();
+document.getElementById("cancelRestore").addEventListener("click",()=>{
+  pendingBackup=null;document.getElementById("restorePreview").hidden=true;setBackupStatus("Restore cancelled. Nothing changed.");
+});
+document.getElementById("confirmRestore").addEventListener("click",async()=>{
+  if (!pendingBackup) return;
+  try {
+    await FM.mutate("restore",{backup:pendingBackup,confirmed:true});
+    pendingBackup=null;document.getElementById("restorePreview").hidden=true;
+    setBackupStatus("Replaced current data. Undo restore is available. Reload form pages.");await render();
+  } catch(e) { setBackupStatus(e.message); }
+});
+document.getElementById("undoRestore").addEventListener("click",async()=>{
+  if (!confirm("Replace current data with the pre-restore recovery snapshot? Changes since restore will be lost.")) return;
+  try { await FM.mutate("undo",{confirmed:true});setBackupStatus("Recovery restored. Reload form pages.");await render(); } catch(e) { setBackupStatus(e.message); }
+});
+document.getElementById("discardRecovery").addEventListener("click",async()=>{
+  if (!confirm("Permanently delete the recovery snapshot? Undo restore will no longer be available.")) return;
+  try { await FM.mutate("discardRecovery");setBackupStatus("Recovery snapshot deleted.");await render(); } catch(e) { setBackupStatus(e.message); }
+});
+window.addEventListener("unhandledrejection",e=>{e.preventDefault();setBackupStatus("Save failed: "+e.reason.message);});
+render().catch(e=>setBackupStatus(e.message));

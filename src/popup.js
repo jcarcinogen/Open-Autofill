@@ -44,21 +44,14 @@ async function render() {
         await FM.setIdentityValue(field.key, input.checked ? "true" : "");
       });
     } else {
-      input.type = field.key === "email" ? "email" : field.key === "phone" ? "tel" : "text";
+      input.type = field.key === "birthday" ? "date" : field.key === "email" ? "email" : field.key === "phone" ? "tel" : "text";
+      if (field.key === "birthday") input.title = "ISO date: YYYY-MM-DD. Recognized form dates are formatted automatically.";
       input.placeholder = field.placeholder;
       input.value = state.identity[field.key] || "";
       const save = async () => {
         await FM.setIdentityValue(field.key, input.value.trim());
-        if (field.key === "firstName" || field.key === "middleName" || field.key === "lastName") {
-          const current = await FM.loadState();
-          const full = [current.identity.firstName, current.identity.middleName, current.identity.lastName]
-            .filter(Boolean)
-            .join(" ");
-          if (full && !current.identity.fullName) await FM.setIdentityValue("fullName", full);
-        }
       };
       input.addEventListener("change", save);
-      input.addEventListener("blur", save);
     }
     wrap.append(label, input);
     identityEl.append(wrap);
@@ -90,19 +83,9 @@ document.getElementById("options").addEventListener("click", () => {
   chrome.runtime.openOptionsPage();
 });
 
-autoFillEl.addEventListener("change", async () => {
-  const state = await FM.loadState();
-  state.settings.autoFill = autoFillEl.checked;
-  await FM.saveState({ settings: state.settings });
-});
-
+autoFillEl.addEventListener("change", async () => { await FM.mutate("settings",{patch:{autoFill:autoFillEl.checked}}); });
 document.getElementById("enableMemory").addEventListener("click", async () => {
-  const state = await FM.loadState();
-  state.settings.consented = true;
-  state.settings.autoFill = true;
-  state.settings.autoLearn = true;
-  await FM.saveState({ settings: state.settings });
-  render();
+  await FM.mutate("settings",{patch:{consented:true,autoFill:true,autoLearn:true}}); await render();
 });
-
-render();
+window.addEventListener("unhandledrejection",e=>{e.preventDefault();showStatus("Save failed: "+e.reason.message,true);});
+render().catch(e=>showStatus(e.message,true));

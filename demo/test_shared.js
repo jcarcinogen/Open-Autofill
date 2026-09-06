@@ -2,7 +2,7 @@ const fs = require("fs");
 const path = require("path");
 const vm = require("vm");
 
-const ctx = { console };
+const ctx = { console, URL };
 vm.createContext(ctx);
 vm.runInContext(fs.readFileSync(path.join(__dirname, "..", "src", "shared.js"), "utf8"), ctx);
 
@@ -23,7 +23,16 @@ const assert = (condition, message) => {
   assert(imported.identity.email === "alex@example.com", "import keeps identity");
   assert(imported.identity.middleName === "Quinn", "import keeps new identity fields");
   assert(imported.cleared.phone === true, "import preserves intentional clear markers");
-  assert(imported.sites["example.com"], "import keeps remembered sites");
+  assert(imported.legacySites["example.com"], "hostname records become inactive legacy sites");
+  assert(!imported.sites["example.com"], "hostname records are not replayed as origin memory");
+
+  const originBackup = ctx.FM.normalizeBackupState({
+    sites: { "https://example.com": { forms: { "/form": { fields: [{ key: "name:favorite", value: "blue" }] } } } }
+  });
+  assert(originBackup.sites["https://example.com"].forms["/form"].fields[0].value === "blue", "origin-scoped forms are kept");
+
+  const hybrid = ctx.FM.normalizeBackupState({ origins: { "https://old.example": { trusted: true } } });
+  assert(hybrid.hybridOrigins["https://old.example"].trusted === true, "discarded hybrid origins stay preserved and inactive");
 
   const malformed = ctx.FM.normalizeBackupState({
     settings: "not an object",
@@ -42,11 +51,11 @@ const assert = (condition, message) => {
       "valid.example": { fields: [null, { key: "name:favorite", aliases: "not an array", value: "blue" }] }
     }
   });
-  assert(Array.isArray(malformedSite.sites["example.com"].fields), "malformed site fields become an empty array");
-  assert(malformedSite.sites["example.com"].fields.length === 0, "malformed site fields are discarded");
-  assert(malformedSite.sites["valid.example"].fields.length === 1, "malformed field records are discarded");
+  assert(Array.isArray(malformedSite.legacySites["example.com"].fields), "malformed site fields become an empty array");
+  assert(malformedSite.legacySites["example.com"].fields.length === 0, "malformed site fields are discarded");
+  assert(malformedSite.legacySites["valid.example"].fields.length === 1, "malformed field records are discarded");
   assert(
-    Array.isArray(malformedSite.sites["valid.example"].fields[0].aliases),
+    Array.isArray(malformedSite.legacySites["valid.example"].fields[0].aliases),
     "malformed aliases become an empty array"
   );
 
@@ -72,8 +81,8 @@ const assert = (condition, message) => {
       }
     }
   });
-  assert(poisoned.sites["example.com"].fields[0].semantic === "", "object semantic is discarded");
-  assert(poisoned.sites["example.com"].fields[0].value === "", "object value is discarded");
+  assert(poisoned.legacySites["example.com"].fields[0].semantic === "", "object semantic is discarded");
+  assert(poisoned.legacySites["example.com"].fields[0].value === "", "object value is discarded");
 
   const radioKept = ctx.FM.normalizeBackupState({
     sites: {
@@ -89,8 +98,8 @@ const assert = (condition, message) => {
       }
     }
   });
-  assert(radioKept.sites["example.com"].fields[0].optionLabel === "Blue", "radio option labels survive load");
-  assert(radioKept.sites["example.com"].fields[0].optionValue === "b", "radio option values survive load");
+  assert(radioKept.legacySites["example.com"].fields[0].optionLabel === "Blue", "radio option labels survive load");
+  assert(radioKept.legacySites["example.com"].fields[0].optionValue === "b", "radio option values survive load");
 
   const upgraded = ctx.FM.normalizeBackupState({
     settings: { autoFill: true },
@@ -102,6 +111,9 @@ const assert = (condition, message) => {
 
   const parsed = ctx.FM.parseBackup(backup);
   assert(parsed.identity.email === "alex@example.com", "parseBackup accepts a real export");
+  const envelope = ctx.FM.createBackup(parsed);
+  assert(envelope.format === "open-autofill", "export is versioned");
+  assert(ctx.FM.parseBackup(envelope).identity.email === "alex@example.com", "versioned export round-trips");
   const placeholderCopy = ctx.FM.IDENTITY_FIELDS.map((field) => field.placeholder || "").join(" ");
   assert(!/Everett|98204/.test(placeholderCopy), "public UI placeholders do not expose the maintainer's location");
   console.log("ok");

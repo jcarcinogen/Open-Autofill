@@ -108,6 +108,19 @@ test('site select corrections replay exact raw values without semantic reinterpr
   assert.equal(M.selectOptionMatches({source:'site',value:' A ',semantic:null},{value:'A',text:' A '}),false);
 });
 
+test('Remember snapshots extras and checkbox state without changing usual answers', () => {
+  const extra = {tag:'select', type:'select-one', name:'venue', id:'venue', label:'Location'};
+  const box = {type:'checkbox', name:'rules', label:'I agree to the Official Rules', required:true};
+  const identity = {email:'you@example.com', phone:'2065550100', agreeToRules:'true'};
+  assert.equal(M.shouldRememberCurrentValue(extra, 'Renton', identity, {}), true);
+  assert.equal(M.shouldRememberCurrentValue(box, false, identity, {}), true);
+  const phone = {tag:'input', type:'tel', name:'phone', autocomplete:'tel', label:'Phone'};
+  assert.equal(M.shouldRememberCurrentValue(phone, '3605550100', identity, {}), true);
+  const learned = M.learnFromField(phone, '3605550100', identity, [], {});
+  assert.deepEqual(learned.identity, identity);
+  assert.equal(M.resolveValue(phone, identity, learned.siteFields, {}).value, '3605550100');
+});
+
 test('number MM/DD/YYYY parts under a Date of Birth heading classify and fill from identity', () => {
   const identity = {birthday:'1990-05-15'};
   const month = {type:'number', tag:'input', name:'month', id:'month', placeholder:'MM', label:'Month', groupLabel:'Date of Birth *'};

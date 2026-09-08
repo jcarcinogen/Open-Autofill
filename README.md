@@ -18,7 +18,7 @@ Original software, not Lightning Autofill and not based on its code.
 **Page edits never rewrite Your usual answers**, even on submit or **Remember this page**. Change those defaults only in popup/settings or through a confirmed backup restore. Different names, addresses, email addresses, and other answers can stay local—not just contact details.
 
 - `Alt+Shift+F`: Fill this page explicitly (replaces permitted values).
-- `Alt+Shift+S`: Remember this page (flushes genuine captured edits, not page-prefilled values).
+- `Alt+Shift+S`: Remember this page (saves extras, checkbox/radio state, and site-specific answers currently on the form; never changes Your usual answers).
 - Right-click: Fill, Remember, or ignore the current site.
 - Settings: forget a site's local memory and manage ignored sites.
 
@@ -35,7 +35,7 @@ Original software, not Lightning Autofill and not based on its code.
 - Automatic filling preserves user edits and nonempty page defaults. It skips hidden controls; explicit Fill does not bypass safety exclusions.
 - Global terms automation is settings-only. Checking one site's rules never turns it on globally. Age, residency, and eligibility facts are not inferred from that setting. A local unchecked choice takes precedence.
 - Site memory uses the exact origin (scheme, host, port) and a form scope. Different origins and distinct forms do not share corrections.
-- Same-origin embedded forms can fill; cross-origin embeds are skipped. Ignoring a site applies to its frames too.
+- Embedded forms fill, including third-party http(s) frames. Site memory is stored for the frame's origin. Ignoring a site applies to that tab's frames too.
 - Storage changes are serialized through the extension service worker to avoid lost updates and stale edits resurrecting forgotten data.
 
 **Local-only is not a privacy shield from the page:** website scripts can read a filled value before Submit. Enable automatic filling only if that tradeoff suits your browsing, and ignore sites where you do not want it. No form is submitted automatically.

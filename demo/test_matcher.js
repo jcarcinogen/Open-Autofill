@@ -819,4 +819,46 @@ const dobSites = {
 const strippedDobSites = FM.stripSemanticFromSites(dobSites, "birthday");
 assert(strippedDobSites["example.com"].fields.length === 1, "clearing birthday removes all DOB parts");
 
+assert(M.fieldText("F i r s t   N a m e") === "First Name", "spaced placeholder collapses to first name");
+assert(M.fieldText("E m a i l") === "Email", "spaced email placeholder collapses");
+assert(M.fieldText("Z i p") === "Zip", "spaced zip placeholder collapses");
+assert(M.fieldText("F\u200bir\u200bst \u200bN\u200bam\u200be*") === "First Name*", "zero-width spaces are stripped from labels");
+assert(M.classifyFromText("F i r s t   N a m e") === "firstName", "spaced first-name placeholder classifies");
+assert(M.classifyFromText("E m a i l") === "email", "spaced email placeholder classifies");
+assert(M.classifyFromText("Z i p") === "zip", "spaced zip placeholder classifies");
+assert(M.classifyFromText("I agree to the rules") !== "email", "normal sentences are not collapsed into identity");
+const hwEmail = {
+  tag: "input",
+  type: "text",
+  name: "ctl00$body_content$e",
+  id: "e",
+  placeholder: "E m a i l",
+  autocomplete: "",
+  label: "E\u200bma\u200bil A\u200bdd\u200bre\u200bss*",
+  ariaLabel: "",
+  value: "",
+  disabled: false,
+  readOnly: false
+};
+assert(M.classify(hwEmail, {}).semantic === "email", "obfuscated email label classifies as email");
+assert(M.classify({ ...hwEmail, name: "ctl00$body_content$f", id: "f", placeholder: "F i r s t   N a m e", label: "F\u200bir\u200bst \u200bN\u200bam\u200be*" }, {}).semantic === "firstName", "obfuscated first name classifies");
+assert(M.classify({ ...hwEmail, name: "ctl00$body_content$z", id: "z", placeholder: "Z i p", label: "Z\u200bip C\u200bod\u200be*" }, {}).semantic === "zip", "obfuscated zip classifies");
+const rulesRadio = {
+  tag: "input",
+  type: "radio",
+  name: "rules",
+  id: "rules",
+  label: "Click here to indicate that you have read the official rules.*",
+  value: "yes",
+  required: true
+};
+assert(M.resolveValue(rulesRadio, { agreeToRules: "true" }, [], {}).value, "required official-rules radio fills from settings agreement");
+assert(!M.resolveValue({ ...rulesRadio, label: "I am 18 years or older", required: true }, { agreeToRules: "true" }, [], {}).value, "eligibility radio is not inferred from settings agreement");
+assert(M.shouldRememberCurrentValue({ tag: "select", type: "select-one", name: "location", label: "Topgolf Location" }, "WA - Seattle - Renton", {}, {}), "Remember keeps unidentified extras");
+assert(M.shouldRememberCurrentValue({ tag: "input", type: "checkbox", name: "rules", label: "I agree to the Official Rules" }, false, {}, {}), "Remember stores unchecked boxes");
+assert(!M.shouldRememberCurrentValue({ tag: "input", type: "email", name: "email", autocomplete: "email", label: "Email" }, "you@example.com", { email: "you@example.com" }, {}), "Remember does not rewrite usual email");
+assert(M.shouldRememberCurrentValue({ tag: "input", type: "tel", name: "phone", autocomplete: "tel", label: "Phone" }, "3605550100", { phone: "2065550100" }, {}), "Remember stores a different site phone");
+assert(!M.shouldRememberCurrentValue({ tag: "input", type: "email", name: "email", autocomplete: "email", label: "Email" }, "", { email: "you@example.com" }, {}), "Remember does not blank-suppress unfilled identity");
+assert(FM.cleanNodeText({ textContent: "F\u200bir\u200bst \u200bN\u200bam\u200be*" }) === "First Name*", "cleanNodeText strips zero-width label junk");
+
 console.log("ok");

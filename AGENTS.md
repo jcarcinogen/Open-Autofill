@@ -9,7 +9,7 @@ Repo: `~/Projects/Open-Autofill` · public `github.com/jcarcinogen/Open-Autofill
 - Identity + per-site extra fields stay in this Chrome profile, keeping the product local-only with no cloud dependency or daily cap.
 - Search boxes stay skipped by default so ordinary browsing is not mistaken for form entry.
 - All permitted corrections stay exact-origin-and-form-local. **Your usual answers never change from webpage learning, submit, or Remember.** Only popup/options edits and confirmed backup restore may change them.
-- Preserve automatic filling and genuine-edit learning with no trust/teaching gate. Remember this page flushes captured edits, not page defaults. Capture trusted event values immediately; synthetic/autofill events never teach.
+- Preserve automatic filling and genuine-edit learning with no trust/teaching gate. Remember this page snapshots extras, checkbox/radio state, and site-specific values currently on the form; it never writes Your usual answers. Capture trusted event values immediately; synthetic/autofill events never teach.
 - Route every durable mutation through the service worker queue. Enforce sender/frame scope and stale-edit epochs. Keep legacy hostname records inactive and exportable.
 - Use canonical Birthday settings and explicit page-format hints. Do not guess ambiguous date order; local corrected representations replay exactly.
 - Backups validate, preview and confirm replacement; pre-restore recovery supports undo. No unconfirmed destructive import.

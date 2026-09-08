@@ -3,7 +3,6 @@
   if (window.__fieldMemoryLoaded) return;
   window.__fieldMemoryLoaded = true;
 
-  try { if (window.top.location.origin !== location.origin) return; } catch { return; }
   const HIGHLIGHT = "fm-filled";
   const STYLE_ID = "fm-highlight-style";
   let lastFillCount = 0;
@@ -40,15 +39,16 @@
     if (wrapped) return (wrapped.innerText || wrapped.textContent || "").trim();
     const aria = el.getAttribute("aria-labelledby");
     if (aria && el.ownerDocument) {
-      return aria
+      const named = aria
         .split(/\s+/)
         .map((idRef) => el.ownerDocument.getElementById(idRef))
         .filter(Boolean)
         .map((n) => n.innerText || n.textContent || "")
         .join(" ")
         .trim();
+      if (named) return named;
     }
-    return "";
+    return nearbyFieldLabel(el);
   }
 
   function cssEscape(id) {
@@ -63,6 +63,25 @@
       if (text && text.length <= 120) return text;
     }
     return associatedLabel(el);
+  }
+
+  function nearbyFieldLabel(el) {
+    const prev = el.previousElementSibling;
+    if (prev && !prev.querySelector("input, select, textarea, [role='checkbox'], [role='radio']")) {
+      const text = FM.cleanNodeText(prev);
+      if (text.length >= 2 && text.length <= 80) return text;
+    }
+    const parent = el.parentElement;
+    if (parent && !/^(FORM|BODY|HTML|FIELDSET)$/.test(parent.tagName || "")) {
+      const labeled = parent.querySelector(
+        ":scope > label, :scope > legend, :scope > [class*='label'], :scope > [class*='Label']"
+      );
+      if (labeled && labeled !== el && !labeled.contains(el) && !el.contains(labeled)) {
+        const text = FM.cleanNodeText(labeled);
+        if (text.length >= 2 && text.length <= 80) return text;
+      }
+    }
+    return "";
   }
 
   function labelledByText(el) {
@@ -170,6 +189,11 @@
       .filter((text) => text.length >= 8 && text.length <= 500)
       .sort((a, b) => b.length - a.length)[0] || "";
   }
+  function isChecked(el) {
+    // Native form state is authoritative even if ARIA decoration is stale.
+    return el instanceof HTMLInputElement ? el.checked : el.getAttribute("aria-checked") === "true";
+  }
+
   function inspect(el) {
     const tag = (el.tagName || "").toLowerCase();
     const role = (el.getAttribute("role") || "").toLowerCase();
@@ -184,7 +208,7 @@
     }
     const checked =
       type === "checkbox" || type === "radio"
-        ? !!(el.checked || el.getAttribute("aria-checked") === "true")
+        ? isChecked(el)
         : false;
     return {
       tag,
@@ -275,10 +299,14 @@
 
   function applyValue(el, resolved, highlight, force) {
     if (!resolved || resolved.skip) return false;
-    if (resolved.value === "" && resolved.kind !== "checkbox") return false;
+    // No answer is not an unchecked answer; saved false remains actionable.
+    if (resolved.value === "" || resolved.value == null || resolved.suppressed) return false;
     if (!force && el.dataset.fmUserEdited === "1") return false;
 
     if (resolved.kind === "checkbox" || resolved.kind === "radio") {
+      // ARIA alone describes appearance, not a widget's backing form state.
+      // Only native checkable inputs have a safe, known activation behavior.
+      if (!(el instanceof HTMLInputElement) || !["checkbox", "radio"].includes(el.type)) return false;
       const want = resolved.kind === "radio" ? FMMatcher.radioMatches(inspect(el), resolved) : FMMatcher.isCheckedValue(resolved.value);
       if (resolved.kind === "radio" && !want) return false;
       if (
@@ -294,18 +322,15 @@
       ) {
         return false;
       }
-      const isOn = !!(el.checked || el.getAttribute("aria-checked") === "true");
+      const isOn = isChecked(el);
       if (isOn === want) return false;
       filling = true;
       try {
-        if ("checked" in el) {
-          const desc = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "checked");
-          if (desc && desc.set) desc.set.call(el, want);
-          else el.checked = want;
-        } else {
-          el.setAttribute("aria-checked", String(want));
-        }
-        fire(el);
+        // Activate from the current state: click-driven form libraries need
+        // the click, and the browser supplies input/change exactly once.
+        // Setting checked first would toggle it back to the wrong value.
+        el.click();
+        if (el.checked !== want) return false;
       } finally {
         filling = false;
       }
@@ -357,7 +382,9 @@
     const host = FM.hostFromUrl(location.href);
     if (!host) return { filled: 0, host: "" };
     if (!state.settings.consented) return { filled: 0, host, disabled: true };
-    if (FM.isExcluded(state.settings, host)) return { filled: 0, host, excluded: true };
+    if (FM.isExcluded(state.settings, host) || FM.isExcluded(state.settings, state.topHost)) {
+      return { filled: 0, host, excluded: true };
+    }
     if (!force && !state.settings.autoFill) return { filled: 0, host, disabled: true };
 
     ensureStyle();
@@ -365,6 +392,8 @@
     const site = state.sites[location.origin] || { forms: {} };
     let filled = 0;
     for (const el of collectFields()) {
+      // Earlier field events may remove or hide later controls in this batch.
+      if (!isVisibleEnough(el)) continue;
       const info = inspect(el);
       const resolved = FMMatcher.resolveValue(info, state.identity, site.forms[formScope(el)]?.fields || [], state.settings, state.cleared);
       if (resolved.skip) continue;
@@ -381,15 +410,43 @@
   async function sendSnapshot(snapshot, explicit = false) {
     return FM.mutate("learn", {epoch:snapshot.epoch, scope:snapshot.scope, edits:[{info:snapshot.info,value:snapshot.value}], explicit});
   }
+  function currentLearnValue(el, info) {
+    if (info.type === "checkbox") return !!info.checked;
+    if (info.type === "radio") return info.checked ? FMMatcher.radioPersistValue(info, info.value) : "";
+    return el.value;
+  }
+
   async function rememberPage() {
+    const state = await FM.loadState();
+    const host = FM.hostFromUrl(location.href);
+    if (!host) return { saved: 0, host: "" };
+    if (!state.settings.consented) return { saved: 0, host, disabled: true };
+    if (FM.isExcluded(state.settings, host) || FM.isExcluded(state.settings, state.topHost)) {
+      return { saved: 0, host, excluded: true };
+    }
+    epoch = state.epoch;
+    const byScope = new Map();
+    for (const el of collectFields()) {
+      const info = inspect(el);
+      const value = currentLearnValue(el, info);
+      const userEdited = el.dataset.fmUserEdited === "1" || snapshots.has(el);
+      if (!FMMatcher.shouldRememberCurrentValue(info, value, state.identity, state.settings, { userEdited })) continue;
+      const scope = formScope(el);
+      const edits = byScope.get(scope) || [];
+      edits.push({ info, value });
+      byScope.set(scope, edits);
+    }
     let saved = 0;
-    for (const snapshot of snapshots.values()) { const result = await sendSnapshot(snapshot,true); saved += result.saved || 0; }
-    return {saved, host:location.origin};
+    for (const [scope, edits] of byScope) {
+      const result = await FM.mutate("learn", { epoch, scope, edits, explicit: true });
+      saved += result.saved || 0;
+    }
+    return { saved, host: location.origin };
   }
   function capture(event) {
     if (!event.isTrusted || filling || epoch === null) return;
     const el = event.composedPath()[0];
-    if (!el?.matches?.("input,textarea,select") || !isVisibleEnough(el)) return;
+    if (!el?.matches?.("input,textarea,select,[role='checkbox'],[role='radio']") || !isVisibleEnough(el)) return;
     const info = inspect(el);
     if (info.type === "radio" && !info.checked) return;
     el.dataset.fmUserEdited = "1";
@@ -422,26 +479,30 @@
     setInterval(() => { observeRoots(); fillPage(false).catch(reportError); },1500);
   }
 
-  chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
-    if (!msg || !msg.type) return;
-    if (msg.type === "fm.fill") {
-      fillPage(true).then(sendResponse, e => sendResponse({error:e.message}));
-      return true;
-    }
-    if (msg.type === "fm.remember") {
-      enqueueLearn(() => rememberPage()).then(sendResponse, e => sendResponse({error:e.message}));
-      return true;
-    }
-    if (msg.type === "fm.ping") {
-      sendResponse({
+  function runCommand(type) {
+    if (type === "fm.fill") return fillPage(true);
+    if (type === "fm.remember") return enqueueLearn(() => rememberPage());
+    if (type === "fm.ping") {
+      return {
         ok: true,
         host: FM.hostFromUrl(location.href),
         lastFillCount,
         lastError,
         fields: collectFields().length
-      });
-      return;
+      };
     }
+    return null;
+  }
+  globalThis.__oaCommand = (type) => runCommand(type);
+
+  chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
+    if (!msg || !msg.type) return;
+    const result = runCommand(msg.type);
+    if (result && typeof result.then === "function") {
+      result.then(sendResponse, e => sendResponse({error:e.message}));
+      return true;
+    }
+    if (result) sendResponse(result);
   });
 
   watch();

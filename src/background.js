@@ -8,15 +8,22 @@ async function pageOrigin(sender, state) {
   if (sender.id !== chrome.runtime.id || !sender.tab || !Number.isInteger(sender.tab.id)) throw new Error("Unauthorized page");
   const tab = await chrome.tabs.get(sender.tab.id);
   const origin = FM.originFromUrl(sender.url);
-  if (!origin || origin !== FM.originFromUrl(tab.url) || (sender.origin && sender.origin !== origin)) throw new Error("Cross-origin frames are skipped");
-  if (!state.settings.consented || FM.isExcluded(state.settings, FM.hostFromUrl(tab.url))) throw new Error("Form memory disabled on this page");
+  const tabOrigin = FM.originFromUrl(tab.url);
+  if (!origin || !tabOrigin) throw new Error("Unauthorized page");
+  if (sender.origin && sender.origin !== origin) throw new Error("Frame origin mismatch");
+  if (!state.settings.consented || FM.isExcluded(state.settings, FM.hostFromUrl(tab.url)) || FM.isExcluded(state.settings, FM.hostFromUrl(sender.url))) {
+    throw new Error("Form memory disabled on this page");
+  }
   return origin;
 }
 async function readState(sender) {
   const state = await FM.loadStoredState();
   if (isUI(sender)) { const raw = await chrome.storage.local.get("recovery"); return {state:{...state,hasRecovery:!!raw.recovery}}; }
   const origin = await pageOrigin(sender, state);
-  return {state:{...state, sites:{[origin]:state.sites[origin] || {forms:{}}}, legacySites:{}, hybridOrigins:{}}};
+  return {state:{...state, sites:{[origin]:state.sites[origin] || {forms:{}}}, legacySites:{}, hybridOrigins:{}, topHost: FM.hostFromUrl(tabUrl(sender))}};
+}
+function tabUrl(sender) {
+  return sender && sender.tab && sender.tab.url ? sender.tab.url : "";
 }
 async function mutate(msg, sender) {
   const state = await FM.loadStoredState();
@@ -93,15 +100,32 @@ async function sendToActiveTab(type) {
   if (!tab || tab.id == null || !isInjectable(tab.url)) {
     return { error: "This page cannot be filled (browser or store pages are blocked)." };
   }
+  const merge = (results) => {
+    const out = { filled: 0, saved: 0, host: FM.hostFromUrl(tab.url) };
+    for (const item of results || []) {
+      const r = item && item.result;
+      if (!r) continue;
+      if (r.error) return r;
+      out.filled += Number(r.filled) || 0;
+      out.saved += Number(r.saved) || 0;
+    }
+    return out;
+  };
+  const dispatch = () =>
+    chrome.scripting.executeScript({
+      target: { tabId: tab.id, allFrames: true },
+      func: (command) => (typeof globalThis.__oaCommand === "function" ? globalThis.__oaCommand(command) : null),
+      args: [type]
+    });
   try {
-    return await chrome.tabs.sendMessage(tab.id, { type });
+    return merge(await dispatch());
   } catch {
     try {
       await chrome.scripting.executeScript({
         target: { tabId: tab.id, allFrames: true },
         files: ["src/shared.js", "src/matcher.js", "src/content.js"]
       });
-      return await chrome.tabs.sendMessage(tab.id, { type });
+      return merge(await dispatch());
     } catch (err) {
       return { error: String(err && err.message ? err.message : err) };
     }

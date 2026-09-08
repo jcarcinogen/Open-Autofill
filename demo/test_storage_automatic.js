@@ -28,8 +28,11 @@ async function send(msg,sender=ui){return new Promise((resolve,reject)=>{const r
  assert.equal((await send(learn,page)).ok,true);
  assert.equal(data.identity.email,'you@example.com','page does not change global identity');
  assert.ok(data.sites['https://example.com'].forms[learn.scope].fields.length);
- const cross={...page,url:'https://other.com/form',origin:'https://other.com',frameId:2};
- assert.ok((await send(learn,cross)).error,'cross-origin denied');
+ const iframe={...page,url:'https://promo.example/embed',origin:'https://promo.example',frameId:2};
+ assert.equal((await send({...learn, scope:'/embed'}, iframe)).ok, true, 'embedded form frames can learn');
+ assert.ok(data.sites['https://promo.example'].forms['/embed'].fields.length);
+ const spoof={...page,url:'https://example.com/form',origin:'https://evil.com'};
+ assert.ok((await send(learn,spoof)).error,'origin mismatch denied');
  await send({type:'fm.mutate',op:'forget',origin:'https://example.com'});
  assert.ok((await send(learn,page)).error,'old epoch rejected');
  assert.equal(data.sites['https://example.com'],undefined);

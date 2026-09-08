@@ -289,6 +289,7 @@
 
   function cleanNodeText(node) {
     return String((node && (node.innerText || node.textContent)) || "")
+      .replace(/[\u200B-\u200D\u2060\uFEFF\u00AD]/g, "")
       .replace(/\s+/g, " ")
       .trim();
   }

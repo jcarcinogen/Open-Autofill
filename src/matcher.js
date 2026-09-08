@@ -127,10 +127,23 @@
     "range"
   ]);
 
+  function stripInvisible(s) {
+    return String(s || "").replace(/[\u200B-\u200D\u2060\uFEFF\u00AD]/g, "");
+  }
+
+  function collapseSpacedLetters(s) {
+    return String(s || "").replace(
+      /(^|[^A-Za-z0-9])(?:[A-Za-z0-9] ){2,}[A-Za-z0-9](?![A-Za-z0-9])/g,
+      (match, prefix) => prefix + match.slice(prefix.length).replace(/ /g, "")
+    );
+  }
+
+  function fieldText(s) {
+    return collapseSpacedLetters(stripInvisible(s)).replace(/\s+/g, " ").trim();
+  }
+
   function norm(s) {
-    return String(s || "")
-      .replace(/\s+/g, " ")
-      .trim();
+    return stripInvisible(s).replace(/\s+/g, " ").trim();
   }
 
   function preferredCheckboxLabel(label, context) {
@@ -151,7 +164,7 @@
       info.context,
       info.type
     ]
-      .map(norm)
+      .map(fieldText)
       .filter(Boolean)
       .join(" | ");
   }
@@ -168,13 +181,13 @@
       info.groupLabel,
       info.context
     ]
-      .map(norm)
+      .map(fieldText)
       .filter(Boolean)
       .join(" | ");
   }
 
   function classifyFromText(text) {
-    const t = norm(text);
+    const t = fieldText(text);
     if (!t) return null;
     for (const { key, re } of SEMANTIC_PATTERNS) {
       if (re.test(t)) return key;
@@ -424,10 +437,11 @@
     );
     if (isBirthdayPartSemantic(normalizedSemantic)) keys.push("dob:" + normalizedSemantic);
     const push = (prefix, raw, allowVolatile) => {
-      const v = norm(raw);
+      const useFieldText = prefix.startsWith("label") || prefix.startsWith("aria") || prefix.startsWith("ph") || prefix.startsWith("radiogroup");
+      const v = useFieldText ? fieldText(raw) : norm(raw);
       if (!v) return;
       if (!allowVolatile && isVolatileToken(v)) return;
-      keys.push(prefix + (prefix.startsWith("label") || prefix.startsWith("aria") || prefix.startsWith("ph") ? v.toLowerCase() : v));
+      keys.push(prefix + (useFieldText ? v.toLowerCase() : v));
     };
     if (kind === "radio") {
       push("radioname:", info.groupName || info.name, false);
@@ -594,6 +608,17 @@
           source: "site"
         };
       }
+      if (
+        checkboxRole({ ...info, type: "checkbox" }) === "agreement" &&
+        isCheckedValue(identityValue(identity, "agreeToRules"))
+      ) {
+        return {
+          ...meta,
+          value: info.value || info.label || "true",
+          optionLabel: fieldText(info.label) || norm(info.value),
+          source: "identity"
+        };
+      }
       return { ...meta, value: "", source: null };
     }
 
@@ -693,6 +718,24 @@
     return { identity: nextIdentity, siteFields: nextSite, cleared, learned };
   }
 
+  function shouldRememberCurrentValue(info, value, identity, settings, options) {
+    const meta = classify(info, settings);
+    if (meta.skip || meta.sensitive) return false;
+    const userEdited = !!(options && options.userEdited);
+    if (meta.kind === "radio") {
+      return !(value === false || value === "false" || value === "");
+    }
+    if (meta.kind === "checkbox") return true;
+    const trimmed = value == null ? "" : String(value);
+    if (meta.semantic) {
+      if (trimmed === "") return userEdited;
+      const usual = identityValue(identity, meta.semantic);
+      if (usual && semanticValuesEqual(meta.semantic, usual, trimmed)) return false;
+      return true;
+    }
+    return trimmed !== "" || userEdited;
+  }
+
   root.FMMatcher = {
     AUTOCOMPLETE_MAP,
     SEMANTIC_PATTERNS,
@@ -712,6 +755,8 @@
     resolveValue,
     shouldFillResolvedValue,
     learnFromField,
+    shouldRememberCurrentValue,
+    fieldText,
     blobFromField,
     isCheckedValue,
     selectOptionMatches

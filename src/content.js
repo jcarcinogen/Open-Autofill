@@ -23,20 +23,28 @@
     (document.head || document.documentElement).appendChild(style);
   }
 
+  function labelText(node) {
+    if (!node) return "";
+    const copy = node.cloneNode(true);
+    for (const control of copy.querySelectorAll("input, select, textarea, button, option, script, style")) control.remove();
+    return (copy.innerText || copy.textContent || "").replace(/\s+/g, " ").trim();
+  }
+
   function associatedLabel(el) {
     if (el.labels && el.labels.length) {
       return Array.from(el.labels)
-        .map((l) => l.innerText || l.textContent || "")
+        .map(labelText)
+        .filter(Boolean)
         .join(" ")
         .trim();
     }
     const id = el.id;
     if (id && el.ownerDocument) {
       const byFor = el.ownerDocument.querySelector(`label[for="${cssEscape(id)}"]`);
-      if (byFor) return (byFor.innerText || byFor.textContent || "").trim();
+      if (byFor) return labelText(byFor);
     }
     const wrapped = el.closest("label");
-    if (wrapped) return (wrapped.innerText || wrapped.textContent || "").trim();
+    if (wrapped) return labelText(wrapped);
     const aria = el.getAttribute("aria-labelledby");
     if (aria && el.ownerDocument) {
       const named = aria
@@ -59,7 +67,7 @@
   function optionLabel(el) {
     const wrap = el.closest("label");
     if (wrap) {
-      const text = (wrap.innerText || wrap.textContent || "").replace(/\s+/g, " ").trim();
+      const text = labelText(wrap);
       if (text && text.length <= 120) return text;
     }
     return associatedLabel(el);
@@ -237,13 +245,24 @@
     for (const host of root.querySelectorAll("*")) if (host.shadowRoot) fields.push(...collectFields(host.shadowRoot));
     return fields.filter(el => el.isConnected && isVisibleEnough(el));
   }
+  function hasVisibleCheckableLabel(el) {
+    if (!(el instanceof HTMLInputElement) || !["checkbox", "radio"].includes(el.type)) return false;
+    const labels = [...Array.from(el.labels || []), el.closest("label")].filter(Boolean);
+    return labels.some((label) => {
+      const rect = label.getBoundingClientRect();
+      const style = getComputedStyle(label);
+      return !!(rect.width && rect.height && label.getClientRects().length && style.display !== "none" && style.visibility === "visible" && Number(style.opacity) !== 0);
+    });
+  }
+
   function isVisibleEnough(el) {
     if (el.type === "hidden" || !el.isConnected || el.disabled || el.readOnly) return false;
     const rect = el.getBoundingClientRect();
     if (!rect.width || !rect.height || !el.getClientRects().length) return false;
+    const transparentCheckable = hasVisibleCheckableLabel(el);
     for (let node = el; node; node = node.parentElement || node.getRootNode()?.host) {
       const style = getComputedStyle(node);
-      if (node.hidden || node.inert || node.getAttribute("aria-hidden") === "true" || style.display === "none" || style.visibility !== "visible" || Number(style.opacity) === 0 || style.contentVisibility === "hidden") return false;
+      if (node.hidden || node.inert || node.getAttribute("aria-hidden") === "true" || style.display === "none" || style.visibility !== "visible" || (Number(style.opacity) === 0 && !(node === el && transparentCheckable)) || style.contentVisibility === "hidden") return false;
     }
     return true;
   }
@@ -263,13 +282,6 @@
     if (type === "time") return /^\d{1,2}:\d{2}/.test(v);
     if (type === "datetime-local") return /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}/.test(v);
     if (type === "number" || type === "range") return v !== "" && !Number.isNaN(Number(v));
-    if (el.pattern) {
-      try {
-        return new RegExp("^(?:" + el.pattern + ")$").test(v);
-      } catch {
-        return true;
-      }
-    }
     return true;
   }
 
@@ -295,6 +307,15 @@
   function fire(el) {
     el.dispatchEvent(new Event("input", { bubbles: true, composed: true }));
     el.dispatchEvent(new Event("change", { bubbles: true, composed: true }));
+  }
+
+  function selectHasMeaningfulSelection(el) {
+    const option = el.selectedOptions && el.selectedOptions[0];
+    if (!option || option.value === "") return false;
+    const prompt = (option.textContent || "").replace(/\s+/g, " ").trim();
+    if (option.index === 0 && /^(choose|select|please select|pick)(\b|\s)/i.test(prompt)) return false;
+    if (option.disabled && option.index === 0) return false;
+    return true;
   }
 
   function applyValue(el, resolved, highlight, force) {
@@ -339,7 +360,7 @@
     }
 
     if (resolved.kind === "select") {
-      if (!force && el.value !== "") return false;
+      if (!force && selectHasMeaningfulSelection(el)) return false;
       const options = Array.from(el.options || []);
       const match = options.find((o) => FMMatcher.selectOptionMatches(resolved, o));
       if (!match) return false;

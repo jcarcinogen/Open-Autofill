@@ -347,7 +347,7 @@
   }
 
   function radioPersistValue(info, value) {
-    if (value === false || value === "false" || value === "") return "";
+    if (value === false || value === "") return "";
     if (isCheckedValue(value) && String(value) !== String(info.value || "") && String(value).toLowerCase() !== "on") {
       return norm(info.label) || norm(info.value) || "true";
     }
@@ -554,6 +554,8 @@
     const wantedSemantic = normalizeSemantic(semantic);
     return (
       siteFields.find((f) => {
+        const storedKind = String(f.type || "").toLowerCase();
+        if (storedKind && kind && storedKind !== kind) return false;
         const keyMatches = siteFieldKeyMatches(f, keys, kind);
         const storedSemantic = normalizeSemantic(f.semantic);
         const semanticMatches = storedSemantic === wantedSemantic;
@@ -677,7 +679,7 @@
     if (trimmed === "" && meta.kind === "radio") {
       return { identity: nextIdentity, siteFields: nextSite, cleared, learned: null };
     }
-    if (meta.kind === "radio" && (value === false || value === "false")) {
+    if (meta.kind === "radio" && value === false) {
       return { identity: nextIdentity, siteFields: nextSite, cleared, learned: null };
     }
 
@@ -723,7 +725,7 @@
     if (meta.skip || meta.sensitive) return false;
     const userEdited = !!(options && options.userEdited);
     if (meta.kind === "radio") {
-      return !(value === false || value === "false" || value === "");
+      return !(value === false || value === "");
     }
     if (meta.kind === "checkbox") return true;
     const trimmed = value == null ? "" : String(value);

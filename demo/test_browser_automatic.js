@@ -75,6 +75,15 @@ document.querySelector('#trigger').addEventListener('input',()=>{
 <div role="checkbox" aria-checked="false" aria-required="true" aria-label="I agree to the Official Rules and Privacy Policy" tabindex="0">Agree</div>
 <button role="checkbox" aria-checked="false" aria-label="I agree to the Official Rules and Privacy Policy">Agree</button>
 </form><script>window.submits=0;document.querySelector('form').addEventListener('submit',event=>{event.preventDefault();submits++;});</script></body>`;
+ if(req.url.startsWith('/site-controls')) body=`<!doctype html><html><body>
+<form id="site-controls">
+<label>Phone number <input id="masked-phone" type="tel" pattern="\\(\\d{3}\\) \\d{3}-\\d{4}"></label>
+<label>Topgolf Location * <select id="venue-sentinel" name="PLAY_SITE"><option value="0">Choose Venue</option><option value="Mobile">AL - Mobile</option><option value="Renton">WA - Seattle - Renton</option></select></label>
+<label for="styled-rules"><input id="styled-rules" name="rules" type="checkbox" style="opacity:0;width:20px;height:20px">I agree to the Official Rules and Privacy Policy</label>
+<input id="unlabelled-transparent" name="hidden-rules" type="checkbox" aria-label="I agree to the Official Rules and Privacy Policy" style="opacity:0;width:20px;height:20px">
+<fieldset><legend>Would you like a dealer quote?</legend><label for="dealer-yes"><input id="dealer-yes" type="radio" name="dealerQuote" value="true" style="opacity:0;width:20px;height:20px">Yes</label><label for="dealer-no"><input id="dealer-no" type="radio" name="dealerQuote" value="false" style="opacity:0;width:20px;height:20px">No</label></fieldset>
+</form><script>document.querySelector('#masked-phone').addEventListener('input',event=>{const digits=event.target.value.replace(/\\D/g,'').slice(0,10);if(digits.length===10)event.target.value='('+digits.slice(0,3)+') '+digits.slice(3,6)+'-'+digits.slice(6);});</script>
+</body></html>`;
  if(req.url.startsWith('/dates')) body=dateHtml;
  if(req.url.startsWith('/frames')) body=`<!doctype html><body><iframe title="same" src="/form"></iframe><iframe title="cross" src="${remoteOrigin}/form"></iframe></body>`;
  if(req.url.startsWith('/obfuscated')) body=`<!doctype html><html><body>
@@ -101,7 +110,7 @@ async function eventually(fn, expected, message) { let last; for(let i=0;i<50;i+
  const extensionId=new URL(worker.url()).host;
  const opts=await context.newPage();await opts.goto(`chrome-extension://${extensionId}/src/options.html`);
  const errors=[];context.on('page',p=>p.on('pageerror',e=>errors.push(e.message)));
- const identity=await opts.evaluate(()=>({...FM.emptyIdentity(),firstName:'Alex',email:'you@example.com',birthday:'1990-02-17',zip:'62701'}));
+ const identity=await opts.evaluate(()=>({...FM.emptyIdentity(),firstName:'Alex',email:'you@example.com',phone:'2065550199',birthday:'1990-02-17',zip:'62701'}));
  // QA setup writes fake data only inside the disposable extension profile.
  await opts.evaluate(async identity=>{await chrome.storage.local.clear();await chrome.storage.local.set({settings:{...FM.DEFAULT_SETTINGS,consented:true},identity,sites:{},cleared:{}});},identity);
  const page=await context.newPage();
@@ -136,6 +145,42 @@ async function eventually(fn, expected, message) { let last; for(let i=0;i<50;i+
  await check('confirmed restore replaces answers and undo recovers the previous state',async()=>{assert.ok(exported,'export prerequisite');const candidate=structuredClone(exported);candidate.state.identity.firstName='Restored';await opts.locator('#import').setInputFiles({name:'test-backup.json',mimeType:'application/json',buffer:Buffer.from(JSON.stringify(candidate))});opts.on('dialog',d=>d.accept());await opts.locator('#confirmRestore').click();await eventually(async()=>(await storedIdentity()).firstName,'Restored');await opts.locator('#undoRestore').click();await eventually(async()=>(await storedIdentity()).firstName,'Robin');});
  await check('malformed and future-version backups cannot wipe stored answers',async()=>{for(const candidate of [{identity:{}},{...exported,version:999}]){await opts.locator('#import').setInputFiles({name:'bad.json',mimeType:'application/json',buffer:Buffer.from(JSON.stringify(candidate))});await opts.waitForTimeout(150);assert.equal((await storedIdentity()).firstName,'Robin');assert.equal(await opts.locator('#confirmRestore').isVisible(),false);}});
  await check('obfuscated labels fill and Remember keeps extras plus eligibility boxes',async()=>{const usual=await storedIdentity();await go(base[0]+'/obfuscated');await eventually(()=>page.locator('#hw-email').inputValue(),usual.email);assert.equal(await page.locator('#hw-first').inputValue(),usual.firstName);await page.locator('#venue').selectOption('renton');await page.locator('#age').check();await page.waitForTimeout(350);await pageCommand('fm.remember');assert.deepEqual(await storedIdentity(),usual);await page.reload();await page.waitForTimeout(700);assert.equal(await page.locator('#venue').inputValue(),'renton');assert.equal(await page.locator('#age').isChecked(),true);});
+ await check('masked phone fields accept raw usual answers for page formatting',async()=>{
+   await go(base[0]+'/site-controls');
+   assert.equal(await page.locator('#masked-phone').inputValue(),'(206) 555-0199');
+ });
+ await check('wrapped select labels exclude options and sentinel prompts replay saved choices',async()=>{
+   await page.locator('#venue-sentinel').selectOption('Renton');
+   await page.waitForTimeout(350);
+   await pageCommand('fm.remember');
+   const siteFields=await opts.evaluate(async origin=>Object.values((await chrome.storage.local.get('sites')).sites[origin].forms).flatMap(form=>form.fields),base[0]);
+   const venueRecord=siteFields.find(field=>field.key==='name:PLAY_SITE');
+   assert.equal(venueRecord.semantic,null);
+   await page.reload();
+   await page.waitForTimeout(700);
+   assert.equal(await page.locator('#venue-sentinel').inputValue(),'Renton');
+ });
+ await check('transparent native checkboxes with visible labels remember and replay',async()=>{
+   await go(base[0]+'/site-controls');
+   await page.locator('label[for="styled-rules"]').click();
+   await page.waitForTimeout(350);
+   await pageCommand('fm.remember');
+   const fields=await opts.evaluate(async origin=>Object.values((await chrome.storage.local.get('sites')).sites[origin].forms).flatMap(form=>form.fields),base[0]);
+   assert.equal(fields.some(field=>field.key==='id:unlabelled-transparent'||field.aliases?.includes('id:unlabelled-transparent')),false);
+   await page.reload();
+   await page.waitForTimeout(700);
+   assert.equal(await page.locator('#styled-rules').isChecked(),true);
+ });
+ await check('transparent false-valued radios remember the selected option',async()=>{
+   await go(base[0]+'/site-controls');
+   await page.locator('label[for="dealer-no"]').click();
+   await page.waitForTimeout(350);
+   await pageCommand('fm.remember');
+   await page.reload();
+   await page.waitForTimeout(700);
+   assert.equal(await page.locator('#dealer-no').isChecked(),true);
+   assert.equal(await page.locator('#dealer-yes').isChecked(),false);
+ });
  await check('autofilled checkbox reaches click-driven validation, not only its visual state',async()=>{
    await opts.evaluate(()=>FM.setIdentityValue('agreeToRules','true'));
    await go(base[0]+'/activation');

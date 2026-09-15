@@ -84,6 +84,23 @@ document.querySelector('#trigger').addEventListener('input',()=>{
 <fieldset><legend>Would you like a dealer quote?</legend><label for="dealer-yes"><input id="dealer-yes" type="radio" name="dealerQuote" value="true" style="opacity:0;width:20px;height:20px">Yes</label><label for="dealer-no"><input id="dealer-no" type="radio" name="dealerQuote" value="false" style="opacity:0;width:20px;height:20px">No</label></fieldset>
 </form><script>document.querySelector('#masked-phone').addEventListener('input',event=>{const digits=event.target.value.replace(/\\D/g,'').slice(0,10);if(digits.length===10)event.target.value='('+digits.slice(0,3)+') '+digits.slice(3,6)+'-'+digits.slice(6);});</script>
 </body></html>`;
+ if(req.url.startsWith('/defaulted-state')) body=`<!doctype html><body><form>
+<label class="form-check-label" for="stateOfResidence" id="stateOfResidence">State of residence:</label>
+<select name="stateOfResidence" id="stateOfResidence"><option value="UT" selected>Utah</option><option value="WA">Washington</option><option value="OR">Oregon</option></select>
+</form></body>`;
+ if(req.url.startsWith('/defaulted-extra')) body=`<!doctype html><body><form>
+<label for="meal">Preferred meal</label><select name="meal" id="meal"><option value="pizza" selected>Pizza</option><option value="tacos">Tacos</option></select>
+</form></body>`;
+ if(req.url.startsWith('/visually-hidden-check')) body=`<!doctype html><body><form>
+<input id="eligibility" name="eligibility" type="checkbox" style="display:none">
+<label for="eligibility">I confirm that I am a legal resident and at least eighteen years old.</label>
+<output id="eligibility-state"></output>
+</form><script>document.querySelector('#eligibility').addEventListener('click',event=>{document.querySelector('#eligibility-state').textContent=String(event.target.checked);});</script></body>`;
+ if(req.url.startsWith('/hidden-ancestor-check')) body=`<!doctype html><body><form>
+<div style="display:none"><input id="hidden-ancestor-rules" name="rules" type="checkbox" required></div>
+<label for="hidden-ancestor-rules">I agree to the Official Rules and Privacy Policy</label>
+<output id="hidden-ancestor-state"></output>
+</form><script>document.querySelector('#hidden-ancestor-rules').addEventListener('click',event=>{document.querySelector('#hidden-ancestor-state').textContent=String(event.target.checked);});</script></body>`;
  if(req.url.startsWith('/dates')) body=dateHtml;
  if(req.url.startsWith('/frames')) body=`<!doctype html><body><iframe title="same" src="/form"></iframe><iframe title="cross" src="${remoteOrigin}/form"></iframe></body>`;
  if(req.url.startsWith('/obfuscated')) body=`<!doctype html><html><body>
@@ -110,7 +127,7 @@ async function eventually(fn, expected, message) { let last; for(let i=0;i<50;i+
  const extensionId=new URL(worker.url()).host;
  const opts=await context.newPage();await opts.goto(`chrome-extension://${extensionId}/src/options.html`);
  const errors=[];context.on('page',p=>p.on('pageerror',e=>errors.push(e.message)));
- const identity=await opts.evaluate(()=>({...FM.emptyIdentity(),firstName:'Alex',email:'you@example.com',phone:'2065550199',birthday:'1990-02-17',zip:'62701'}));
+ const identity=await opts.evaluate(()=>({...FM.emptyIdentity(),firstName:'Alex',email:'you@example.com',phone:'2065550199',state:'Washington',birthday:'1990-02-17',zip:'62701'}));
  // QA setup writes fake data only inside the disposable extension profile.
  await opts.evaluate(async identity=>{await chrome.storage.local.clear();await chrome.storage.local.set({settings:{...FM.DEFAULT_SETTINGS,consented:true},identity,sites:{},cleared:{}});},identity);
  const page=await context.newPage();
@@ -137,7 +154,7 @@ async function eventually(fn, expected, message) { let last; for(let i=0;i<50;i+
  await check('birthday formats, native date and zero-based month dropdown fill correctly',async()=>{await go(base[0]+'/dates');assert.equal(await page.locator('#us').inputValue(),'02/17/1990');assert.equal(await page.locator('#eu').inputValue(),'17/02/1990');assert.equal(await page.locator('#iso').inputValue(),'1990-02-17');assert.equal(await page.locator('#dob_m').inputValue(),'1');assert.equal(await page.locator('#dob_d').inputValue(),'17');assert.equal(await page.locator('#dob_y').inputValue(),'1990');assert.equal(await page.locator('#zip').inputValue(),'62701');});
  await check('dynamic open-shadow fields autofill and remember genuine corrections',async()=>{await go(base[0]+'/dynamic');await eventually(()=>page.locator('#shadow-email').inputValue(),identity.email);await edit('#shadow-extra','Peach');await page.reload();await page.waitForTimeout(800);assert.equal(await page.locator('#shadow-extra').inputValue(),'Peach');});
  await check('same-origin and cross-origin form frames both fill',async()=>{await go(base[0]+'/frames');await eventually(()=>page.frameLocator('iframe[title="same"]').locator('#first').inputValue(),'Jordan');await eventually(()=>page.frameLocator('iframe[title="cross"]').locator('#email').inputValue(),identity.email);});
- await check('automatic filling preserves page-prefilled text and dropdown selection',async()=>{await opts.evaluate(()=>FM.setIdentityValue('state','IL'));await go(base[0]+'/defaults');assert.equal(await page.locator('#default-email').inputValue(),'page@example.com');assert.equal(await page.locator('#state').inputValue(),'NY');});
+ await check('automatic filling preserves page-prefilled text and replaces semantic select defaults',async()=>{await opts.evaluate(()=>FM.setIdentityValue('state','IL'));await go(base[0]+'/defaults');assert.equal(await page.locator('#default-email').inputValue(),'page@example.com');assert.equal(await page.locator('#state').inputValue(),'IL');});
  await check('concurrent settings edits do not lose changes',async()=>{const second=await context.newPage();await second.goto(`chrome-extension://${extensionId}/src/options.html`);await Promise.all([opts.evaluate(()=>FM.setIdentityValue('firstName','Robin')),second.evaluate(()=>FM.setIdentityValue('lastName','Rivera'))]);const got=await storedIdentity();assert.equal(got.firstName,'Robin');assert.equal(got.lastName,'Rivera');await second.close();});
  let exported;
  await check('backup export produces a versioned timestamped real download',async()=>{await opts.reload();const pending=opts.waitForEvent('download');await opts.locator('#export').click();const download=await pending;assert.match(download.suggestedFilename(),/open-autofill.*\d{4}/);const stream=await download.createReadStream();const chunks=[];for await(const chunk of stream)chunks.push(chunk);exported=JSON.parse(Buffer.concat(chunks).toString());assert.equal(exported.format,'open-autofill');assert.equal(exported.version,1);assert.ok(exported.exportedAt);assert.equal(exported.state.identity.firstName,'Robin');assert.ok(Object.keys(exported.state.sites).length);});
@@ -180,6 +197,42 @@ async function eventually(fn, expected, message) { let last; for(let i=0;i<50;i+
    await page.waitForTimeout(700);
    assert.equal(await page.locator('#dealer-no').isChecked(),true);
    assert.equal(await page.locator('#dealer-yes').isChecked(),false);
+ });
+ await check('semantic selects replace arbitrary page defaults and replay remembered choices',async()=>{
+   await opts.evaluate(()=>FM.setIdentityValue('state','Washington'));
+   await go(base[0]+'/defaulted-state');
+   const stateSelect=page.locator('select[name="stateOfResidence"]');
+   assert.equal(await stateSelect.inputValue(),'WA');
+   await stateSelect.selectOption('OR');
+   await page.waitForTimeout(350);
+   await pageCommand('fm.remember');
+   await page.reload();
+   await eventually(()=>stateSelect.inputValue(),'OR');
+ });
+ await check('remembered nonsemantic selects replace arbitrary page defaults',async()=>{
+   await go(base[0]+'/defaulted-extra');
+   const meal=page.locator('#meal');
+   await meal.selectOption('tacos');
+   await page.waitForTimeout(350);
+   await pageCommand('fm.remember');
+   await page.reload();
+   await eventually(()=>meal.inputValue(),'tacos');
+ });
+ await check('visually hidden native checkboxes with visible labels remember and replay',async()=>{
+   await go(base[0]+'/visually-hidden-check');
+   await page.locator('label[for="eligibility"]').click();
+   await page.waitForTimeout(350);
+   await pageCommand('fm.remember');
+   await page.reload();
+   await eventually(()=>page.locator('#eligibility').isChecked(),true);
+   assert.equal(await page.locator('#eligibility-state').textContent(),'true');
+ });
+ await check('hidden ancestors remain excluded even when an outside label is visible',async()=>{
+   await opts.evaluate(()=>FM.setIdentityValue('agreeToRules','true'));
+   await go(base[0]+'/hidden-ancestor-check');
+   assert.equal(await page.locator('#hidden-ancestor-rules').isChecked(),false);
+   assert.equal(await page.locator('#hidden-ancestor-state').textContent(),'');
+   assert.equal((await pageCommand('fm.fill')).filled,0);
  });
  await check('autofilled checkbox reaches click-driven validation, not only its visual state',async()=>{
    await opts.evaluate(()=>FM.setIdentityValue('agreeToRules','true'));

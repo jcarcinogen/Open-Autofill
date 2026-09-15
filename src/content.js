@@ -258,11 +258,22 @@
   function isVisibleEnough(el) {
     if (el.type === "hidden" || !el.isConnected || el.disabled || el.readOnly) return false;
     const rect = el.getBoundingClientRect();
-    if (!rect.width || !rect.height || !el.getClientRects().length) return false;
-    const transparentCheckable = hasVisibleCheckableLabel(el);
+    const checkableWithVisibleLabel = hasVisibleCheckableLabel(el);
+    if ((!rect.width || !rect.height || !el.getClientRects().length) && !checkableWithVisibleLabel) return false;
     for (let node = el; node; node = node.parentElement || node.getRootNode()?.host) {
       const style = getComputedStyle(node);
-      if (node.hidden || node.inert || node.getAttribute("aria-hidden") === "true" || style.display === "none" || style.visibility !== "visible" || (Number(style.opacity) === 0 && !(node === el && transparentCheckable)) || style.contentVisibility === "hidden") return false;
+      const hiddenCheckableItself = node === el && checkableWithVisibleLabel;
+      if (
+        node.hidden ||
+        node.inert ||
+        node.getAttribute("aria-hidden") === "true" ||
+        (style.display === "none" && !hiddenCheckableItself) ||
+        style.visibility !== "visible" ||
+        (Number(style.opacity) === 0 && !hiddenCheckableItself) ||
+        style.contentVisibility === "hidden"
+      ) {
+        return false;
+      }
     }
     return true;
   }
@@ -360,7 +371,10 @@
     }
 
     if (resolved.kind === "select") {
-      if (!force && selectHasMeaningfulSelection(el)) return false;
+      // Known identity and remembered site answers outrank arbitrary page defaults.
+      // Keep the default guard for any future resolver source without that authority.
+      const answerCanReplaceDefault = resolved.source === "site" || !!resolved.semantic;
+      if (!force && selectHasMeaningfulSelection(el) && !answerCanReplaceDefault) return false;
       const options = Array.from(el.options || []);
       const match = options.find((o) => FMMatcher.selectOptionMatches(resolved, o));
       if (!match) return false;

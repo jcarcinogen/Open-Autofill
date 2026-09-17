@@ -1,6 +1,6 @@
 # Open Autofill
 
-[![ko-fi](https://ko-fi.com/img/githubbutton_sm.svg)](https://ko-fi.com/scottangel)
+[![Tip with X Money](tip-with-x-money.png)](https://x.com/scottito22)
 
 Fast, automatic form memory for Chrome. **Always free. Local only. No daily cap.**
 

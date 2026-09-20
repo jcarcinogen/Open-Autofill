@@ -17,7 +17,7 @@ Repo: `~/Projects/Open-Autofill` · public `github.com/jcarcinogen/Open-Autofill
 - Leave passwords, cards, CVV, and SSN fields untouched to keep secrets outside the extension’s data model.
 - Increment `manifest.json` version on every behavioral or UI change so builds remain distinguishable.
 - Keep broad `host_permissions` because general always-available form filling is the core function; `activeTab` would break that behavior.
-- Keep the Ko-fi badge near the top of the README.
+- Keep the Tip with X Money badge near the top of the README: `[![Tip with X Money](tip-with-x-money.svg)](https://x.com/scottito22)`. Do not add Ko-fi.
 
 ## How to work
 

@@ -1,6 +1,6 @@
 # Open Autofill
 
-[![Tip with X Money](tip-with-x-money.png)](https://x.com/scottito22)
+[![Tip with X Money](tip-with-x-money.svg)](https://x.com/scottito22)
 
 Fast, automatic form memory for Chrome. **Always free. Local only. No daily cap.**
 

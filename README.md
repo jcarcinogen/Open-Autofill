@@ -54,6 +54,10 @@ Global answers and existing consent are retained. Old hostname-only site records
 
 ## Install in Chrome
 
+Install **[Open Autofill from the Chrome Web Store](https://chromewebstore.google.com/detail/open-autofill/kjpbmbnipcchfpedcmloghlfkdbbhlff)**, then pin it, enable form memory, and set Your usual answers.
+
+For local development:
+
 1. Clone or download this repository.
 2. Open `chrome://extensions` and enable **Developer mode**.
 3. Click **Load unpacked**, choosing this folder (the one containing `manifest.json`).

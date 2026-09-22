@@ -221,6 +221,20 @@
     return null;
   }
 
+  function classifyCompositeLocation(info) {
+    const hint = [info.name, info.id, info.placeholder, info.label, info.ariaLabel]
+      .map(fieldText)
+      .filter(Boolean)
+      .join(" | ");
+    const hasCity = /(^|[^a-z0-9])(city|town)($|[^a-z0-9])|city(?=state|province|region)/i.test(hint);
+    const hasState = /(^|[^a-z0-9])(state|province|region)($|[^a-z0-9])|(?:city|town)(?=state|province|region)/i.test(hint);
+    const hasOtherLocationPart =
+      /(^|[^a-z0-9])(zip|postal|country|street|address)($|[^a-z0-9])/i.test(hint) ||
+      /[a-z](?:Zip|Postal|Country|Street|Address)(?:[A-Z]|[^A-Za-z0-9]|$)/.test(hint);
+    if (!hasCity || !hasState) return null;
+    return hasOtherLocationPart ? "multiPartLocation" : "cityState";
+  }
+
   function classifyInputType(type) {
     const t = String(type || "").toLowerCase();
     if (t === "email") return "email";
@@ -488,7 +502,8 @@
         ? kind === "checkbox" && role === "agreement"
           ? "agreeToRules"
           : null
-        : classifyAutocomplete(info.autocomplete) ||
+        : classifyCompositeLocation(info) ||
+          classifyAutocomplete(info.autocomplete) ||
           classifyBirthdayPart(info) ||
           classifyFromText(descriptiveBlob(info)) ||
           classifyInputType(info.type);
@@ -506,6 +521,11 @@
 
   function identityValue(identity, semantic) {
     if (!semantic || !identity) return "";
+    if (semantic === "cityState") {
+      const city = String(identity.city || "").trim();
+      const state = String(identity.state || "").trim();
+      return city && state ? `${city}, ${state}` : "";
+    }
     const raw = identity[semantic];
     if (raw != null && String(raw).trim()) return String(raw).trim();
     if (semantic === "fullName") {
@@ -591,7 +611,13 @@
     if (meta.skip) return { ...meta, value: "", source: null };
 
     const clearKey = isBirthdayPartSemantic(meta.semantic) ? "birthday" : meta.semantic;
-    if (clearKey && cleared && cleared[clearKey]) return { ...meta, value: "", source: null, suppressed: true };
+    if (
+      clearKey &&
+      cleared &&
+      (cleared[clearKey] || (clearKey === "cityState" && (cleared.city || cleared.state)))
+    ) {
+      return { ...meta, value: "", source: null, suppressed: true };
+    }
     const site = lookupSiteValue(siteFields, meta.siteKeys, meta.semantic, meta.kind);
     if (site && site.value === "") return { ...meta, value: "", source: "site", suppressed: true };
     if (meta.kind === "checkbox") {

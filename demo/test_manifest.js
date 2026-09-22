@@ -33,4 +33,10 @@ assert(
   /scottdangel\+openautofill@gmail\.com/.test(fs.readFileSync(path.join(__dirname, "..", "store/LISTING.md"), "utf8")),
   "Chrome Web Store listing copy still has the required support email"
 );
+const optionsHtml = fs.readFileSync(path.join(__dirname, "..", "src/options.html"), "utf8");
+assert(
+  /<a[^>]+href="https:\/\/x\.com\/scottito22"[^>]*>[\s\S]*?<img[^>]+src="tip-with-x-money\.svg"[^>]+alt="Tip with X Money"/.test(optionsHtml),
+  "settings support section shows the linked Tip with X Money badge"
+);
+assert(fs.existsSync(path.join(__dirname, "..", "src/tip-with-x-money.svg")), "settings tip badge is packaged under src");
 console.log("ok");

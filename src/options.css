@@ -32,6 +32,17 @@ p { color: var(--muted); line-height: 1.5; text-wrap: pretty; }
 a { color: var(--accent); }
 .muted { color: var(--muted); }
 
+.tip-badge {
+  display: inline-flex;
+  border-radius: 999px;
+  transition: filter 120ms, transform 120ms;
+}
+
+.tip-badge:hover { filter: brightness(1.12); }
+.tip-badge:active { transform: scale(0.97); }
+.tip-badge:focus-visible { outline: 2px solid color-mix(in srgb, var(--accent) 75%, white); outline-offset: 3px; }
+.tip-badge img { display: block; }
+
 .app-header,
 .app-heading,
 .title-row {

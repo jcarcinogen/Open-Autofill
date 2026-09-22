@@ -121,6 +121,26 @@ test('Remember snapshots extras and checkbox state without changing usual answer
   assert.equal(M.resolveValue(phone, identity, learned.siteFields, {}).value, '3605550100');
 });
 
+test('combined city and state fields use both identity values despite a city autocomplete hint', () => {
+  const hiChewField = {
+    tag: 'input',
+    type: 'text',
+    id: 'f-city',
+    name: 'cityState',
+    placeholder: 'City, State',
+    autocomplete: 'address-level2'
+  };
+  const resolved = M.resolveValue(hiChewField, {city:'Springfield', state:'IL'}, [], {});
+  assert.equal(resolved.semantic, 'cityState');
+  assert.equal(resolved.value, 'Springfield, IL');
+  assert.equal(resolved.source, 'identity');
+  assert.equal(M.resolveValue(hiChewField, {city:'Springfield'}, [], {}).value, '');
+  assert.equal(M.classify({...hiChewField,name:'location',placeholder:'Town / Province'}, {}).semantic, 'cityState');
+  const multiPart = M.resolveValue({...hiChewField,name:'cityStateZip',placeholder:''}, {city:'Springfield',state:'IL',zip:'62701'}, [], {});
+  assert.equal(multiPart.semantic, 'multiPartLocation');
+  assert.equal(multiPart.value, '');
+});
+
 test('number MM/DD/YYYY parts under a Date of Birth heading classify and fill from identity', () => {
   const identity = {birthday:'1990-05-15'};
   const month = {type:'number', tag:'input', name:'month', id:'month', placeholder:'MM', label:'Month', groupLabel:'Date of Birth *'};

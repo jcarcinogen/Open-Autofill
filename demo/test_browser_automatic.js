@@ -91,6 +91,9 @@ document.querySelector('#trigger').addEventListener('input',()=>{
  if(req.url.startsWith('/defaulted-extra')) body=`<!doctype html><body><form>
 <label for="meal">Preferred meal</label><select name="meal" id="meal"><option value="pizza" selected>Pizza</option><option value="tacos">Tacos</option></select>
 </form></body>`;
+ if(req.url.startsWith('/combined-city-state')) body=`<!doctype html><body><form>
+<input id="f-city" name="cityState" placeholder="City, State" autocomplete="address-level2">
+</form></body>`;
  if(req.url.startsWith('/visually-hidden-check')) body=`<!doctype html><body><form>
 <input id="eligibility" name="eligibility" type="checkbox" style="display:none">
 <label for="eligibility">I confirm that I am a legal resident and at least eighteen years old.</label>
@@ -127,7 +130,7 @@ async function eventually(fn, expected, message) { let last; for(let i=0;i<50;i+
  const extensionId=new URL(worker.url()).host;
  const opts=await context.newPage();await opts.goto(`chrome-extension://${extensionId}/src/options.html`);
  const errors=[];context.on('page',p=>p.on('pageerror',e=>errors.push(e.message)));
- const identity=await opts.evaluate(()=>({...FM.emptyIdentity(),firstName:'Alex',email:'you@example.com',phone:'2065550199',state:'Washington',birthday:'1990-02-17',zip:'62701'}));
+ const identity=await opts.evaluate(()=>({...FM.emptyIdentity(),firstName:'Alex',email:'you@example.com',phone:'2065550199',city:'Springfield',state:'Washington',birthday:'1990-02-17',zip:'62701'}));
  // QA setup writes fake data only inside the disposable extension profile.
  await opts.evaluate(async identity=>{await chrome.storage.local.clear();await chrome.storage.local.set({settings:{...FM.DEFAULT_SETTINGS,consented:true},identity,sites:{},cleared:{}});},identity);
  const page=await context.newPage();
@@ -135,6 +138,7 @@ async function eventually(fn, expected, message) { let last; for(let i=0;i<50;i+
  const edit=async(sel,value)=>{await page.locator(sel).fill(value);await page.locator(sel).press('Tab');await page.waitForTimeout(350);};
  const storedIdentity=()=>opts.evaluate(async()=> (await chrome.storage.local.get('identity')).identity);
  const pageCommand=type=>opts.evaluate(async({url,type})=>{const tabs=await chrome.tabs.query({});const tab=tabs.find(t=>t.url===url);return chrome.tabs.sendMessage(tab.id,{type},{frameId:0});},{url:page.url(),type});
+ await check('settings shows the Tip with X Money badge',async()=>{const badge=opts.locator('.tip-badge img');assert.equal(await badge.getAttribute('alt'),'Tip with X Money');assert.equal(await badge.isVisible(),true);});
  await check('new pages autofill usual answers without trust or teaching',async()=>{await go();await eventually(()=>page.locator('#email').inputValue(),identity.email);assert.equal(await page.locator('#first').inputValue(),'Alex');});
  await check('real name and email corrections replay locally and never change global answers',async()=>{await edit('#first','Jordan');await edit('#email','local@example.com');await page.reload();await page.waitForTimeout(700);assert.equal(await page.locator('#first').inputValue(),'Jordan');assert.equal(await page.locator('#email').inputValue(),'local@example.com');assert.deepEqual(await storedIdentity(),identity);});
  await check('a separate origin still receives global answers',async()=>{await go(base[1]+'/form');assert.equal(await page.locator('#first').inputValue(),'Alex');assert.equal(await page.locator('#email').inputValue(),identity.email);});
@@ -152,6 +156,7 @@ async function eventually(fn, expected, message) { let last; for(let i=0;i<50;i+
  await check('explicit Fill cannot modify skipped checkboxes or secrets',async()=>{await pageCommand('fm.fill');assert.equal(await page.locator('#captcha').isChecked(),true);for(const id of ['secret','otp','search'])assert.equal(await page.locator('#'+id).inputValue(),'');});
  await check('Remember snapshots extras without rewriting usual answers',async()=>{await page.evaluate(()=>{document.querySelector('#other-extra').value='Untouched default';});await pageCommand('fm.remember');assert.deepEqual(await storedIdentity(),identity);await page.reload();await page.waitForTimeout(650);assert.equal(await page.locator('#other-extra').inputValue(),'Untouched default');});
  await check('birthday formats, native date and zero-based month dropdown fill correctly',async()=>{await go(base[0]+'/dates');assert.equal(await page.locator('#us').inputValue(),'02/17/1990');assert.equal(await page.locator('#eu').inputValue(),'17/02/1990');assert.equal(await page.locator('#iso').inputValue(),'1990-02-17');assert.equal(await page.locator('#dob_m').inputValue(),'1');assert.equal(await page.locator('#dob_d').inputValue(),'17');assert.equal(await page.locator('#dob_y').inputValue(),'1990');assert.equal(await page.locator('#zip').inputValue(),'62701');});
+ await check('combined city and state fields fill both parts despite a city autocomplete hint',async()=>{await go(base[0]+'/combined-city-state');assert.equal(await page.locator('#f-city').inputValue(),'Springfield, Washington');});
  await check('dynamic open-shadow fields autofill and remember genuine corrections',async()=>{await go(base[0]+'/dynamic');await eventually(()=>page.locator('#shadow-email').inputValue(),identity.email);await edit('#shadow-extra','Peach');await page.reload();await page.waitForTimeout(800);assert.equal(await page.locator('#shadow-extra').inputValue(),'Peach');});
  await check('same-origin and cross-origin form frames both fill',async()=>{await go(base[0]+'/frames');await eventually(()=>page.frameLocator('iframe[title="same"]').locator('#first').inputValue(),'Jordan');await eventually(()=>page.frameLocator('iframe[title="cross"]').locator('#email').inputValue(),identity.email);});
  await check('automatic filling preserves page-prefilled text and replaces semantic select defaults',async()=>{await opts.evaluate(()=>FM.setIdentityValue('state','IL'));await go(base[0]+'/defaults');assert.equal(await page.locator('#default-email').inputValue(),'page@example.com');assert.equal(await page.locator('#state').inputValue(),'IL');});

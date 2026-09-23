@@ -1,0 +1,220 @@
+{
+  "screenshots": [
+    {
+      "filename": "01-already-answered-1280x800.png",
+      "dimensions": [
+        1280,
+        800
+      ],
+      "mode": "RGB",
+      "docs_copy_identical": true,
+      "sha256": "dd279d72609f4017ff7db0aeffd3bafd2ac039b92955dec8b9bb84ee46fdf946"
+    },
+    {
+      "filename": "02-extra-questions-1280x800.png",
+      "dimensions": [
+        1280,
+        800
+      ],
+      "mode": "RGB",
+      "docs_copy_identical": true,
+      "sha256": "ddef443d6bbbe2e15de8240716981ec14506175e1844ffc3b816c9e84a68e75e"
+    },
+    {
+      "filename": "03-defaults-stay-yours-1280x800.png",
+      "dimensions": [
+        1280,
+        800
+      ],
+      "mode": "RGB",
+      "docs_copy_identical": true,
+      "sha256": "a226f6561ee63049a1097bd72bc82fbf6148d80013ac69ebad909088d8dd2e1e"
+    },
+    {
+      "filename": "04-free-and-local-1280x800.png",
+      "dimensions": [
+        1280,
+        800
+      ],
+      "mode": "RGB",
+      "docs_copy_identical": true,
+      "sha256": "be458dc18dc6f0e3860ec64d852e50fb3f22407668d6e86b62fc20cf61d39803"
+    }
+  ],
+  "icons": [
+    {
+      "size": 16,
+      "alpha_bbox": [
+        0,
+        0,
+        16,
+        16
+      ],
+      "transparent_corners": true
+    },
+    {
+      "size": 32,
+      "alpha_bbox": [
+        1,
+        1,
+        31,
+        31
+      ],
+      "transparent_corners": true
+    },
+    {
+      "size": 48,
+      "alpha_bbox": [
+        1,
+        1,
+        47,
+        47
+      ],
+      "transparent_corners": true
+    },
+    {
+      "size": 128,
+      "alpha_bbox": [
+        16,
+        16,
+        112,
+        112
+      ],
+      "transparent_corners": true
+    }
+  ],
+  "type_floor_px": {
+    "headline": 76,
+    "subheadline": 32,
+    "smallest": 24
+  },
+  "visual_review_sizes": [
+    [
+      1280,
+      800
+    ],
+    [
+      640,
+      400
+    ]
+  ],
+  "contact_sheet_css_size": [
+    640,
+    400
+  ],
+  "production_sources_changed": true,
+  "published": false,
+  "icon_refresh": [
+    {
+      "filename": "01-already-answered-1280x800.png",
+      "changed_pixel_count": 4158,
+      "changed_regions_xyxy": [
+        [
+          53,
+          35,
+          103,
+          85
+        ],
+        [
+          79,
+          526,
+          123,
+          571
+        ]
+      ],
+      "all_other_pixels_identical": true,
+      "html_only_icon_uri_changed": true,
+      "sha256": "dd279d72609f4017ff7db0aeffd3bafd2ac039b92955dec8b9bb84ee46fdf946"
+    },
+    {
+      "filename": "02-extra-questions-1280x800.png",
+      "changed_pixel_count": 4158,
+      "changed_regions_xyxy": [
+        [
+          53,
+          35,
+          103,
+          85
+        ],
+        [
+          79,
+          536,
+          123,
+          581
+        ]
+      ],
+      "all_other_pixels_identical": true,
+      "html_only_icon_uri_changed": true,
+      "sha256": "ddef443d6bbbe2e15de8240716981ec14506175e1844ffc3b816c9e84a68e75e"
+    },
+    {
+      "filename": "03-defaults-stay-yours-1280x800.png",
+      "changed_pixel_count": 4152,
+      "changed_regions_xyxy": [
+        [
+          53,
+          35,
+          103,
+          85
+        ],
+        [
+          698,
+          401,
+          742,
+          446
+        ]
+      ],
+      "all_other_pixels_identical": true,
+      "html_only_icon_uri_changed": true,
+      "sha256": "a226f6561ee63049a1097bd72bc82fbf6148d80013ac69ebad909088d8dd2e1e"
+    },
+    {
+      "filename": "04-free-and-local-1280x800.png",
+      "changed_pixel_count": 4099,
+      "changed_regions_xyxy": [
+        [
+          53,
+          35,
+          103,
+          85
+        ],
+        [
+          690,
+          185,
+          734,
+          229
+        ]
+      ],
+      "all_other_pixels_identical": true,
+      "html_only_icon_uri_changed": true,
+      "sha256": "be458dc18dc6f0e3860ec64d852e50fb3f22407668d6e86b62fc20cf61d39803"
+    }
+  ],
+  "extension_version": "1.7.7",
+  "screenshot_version_label": "1.7.6 (intentionally unchanged; icon-only artwork edit)",
+  "checks": {
+    "node_suites": [
+      "test_matcher",
+      "test_automatic_matcher",
+      "test_learning_queue",
+      "test_shared",
+      "test_storage_automatic",
+      "test_manifest"
+    ],
+    "node_result": "passed",
+    "icon_generator_test": "passed after observed pre-change failure",
+    "chrome_smoke": {
+      "version": "v1.7.7",
+      "sizes_decoded": [
+        16,
+        32,
+        48,
+        128
+      ],
+      "page_errors": [],
+      "isolated_profile": true,
+      "sandbox_enabled": true
+    },
+    "diff_check": "passed"
+  }
+}
